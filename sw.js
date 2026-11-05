@@ -1,5 +1,5 @@
 // TalkBoard AAC offline cache. Bump VERSION whenever any file changes.
-const VERSION = "talkboard-v8";
+const VERSION = "talkboard-v9";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "privacy.html", "support.html"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

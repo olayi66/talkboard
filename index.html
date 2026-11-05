@@ -341,7 +341,6 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <div class="row"><label>Buttons per page</label><select id="lSel"></select></div>
   <div class="tplpick" id="lPick" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin-top:10px"></div>
   <div class="row"><label><input type="checkbox" id="lFill"> Add empty spaces so the last page is full</label></div>
-  <div class="row" id="lTopicsRow"><label><input type="checkbox" id="lTopics"> Put topic folders on their own last page (“Topics”) — moves folders</label></div>
   <div class="btns"><button class="b" id="lCancel">Cancel</button><button class="b primary" id="lSave">Apply</button></div>
 </div></div>
 
@@ -633,11 +632,12 @@ function cellInner(it){
 function renderBoard(){
   const S=state.settings, bd=curBoard(), id=curId();
   $("crumb").textContent=innerWidth<640?bd.name:path.map(p=>(state.boards[p]||{}).name||p).join(" › ");
+  if(id==="home"&&!drag) ensureHomeTopics();
   const N=boardLayout(bd);
   let items=bd.buttons.map((b,i)=>({b,idx:i}));
   let slice;
   if(N){
-    if(editing && items.length%N===0 && !bd.buttons.some(b=>b.type==="blank")) items.push({add:true,idx:items.length});
+    if(editing && items.length%N===0 && (id==="home"||!bd.buttons.some(b=>b.type==="blank"))) items.push({add:true,idx:items.length});
     pageCount=Math.max(1,Math.ceil(items.length/N));
     pageOf[id]=Math.min(pageOf[id]||0,pageCount-1);
     slice=items.slice(pageOf[id]*N,(pageOf[id]+1)*N);
@@ -1067,7 +1067,6 @@ function renderPick(){
     <span style="font-size:.8rem">${k==="app"?"App setting":k}</span></button>`).join("");
 }
 $("nLayout").onclick=()=>{
-  $("lTopicsRow").style.display=curId()==="home"?"flex":"none"; $("lTopics").checked=false;
   const bd=curBoard();
   $("lSel").innerHTML='<option value="app">Use app setting</option><option value="all">Show all on one screen</option>'+TPL_KEYS.map(n=>`<option value="${n}">${tplName(n)} per page</option>`).join("");
   $("lSel").value=bd.layout?String(bd.layout):"app"; $("lFill").checked=false;
@@ -1080,7 +1079,6 @@ $("lSave").onclick=()=>{
   const bd=curBoard(), v=$("lSel").value;
   if(v==="app") delete bd.layout; else bd.layout=v==="all"?"all":+v;
   const N=boardLayout(bd);
-  if($("lTopics").checked && N && curId()==="home") groupTopics(bd,N);
   if($("lFill").checked && N){ while(bd.buttons.length%N!==0 || bd.buttons.length===0) bd.buttons.push({id:nid(),type:"blank",label:""}); }
   pageOf[curId()]=0; save(); hide("oLayout"); renderBoard();
   toast(N?`${tplName(N)} per page`:"Showing all buttons");
@@ -1533,6 +1531,18 @@ function groupTopics(board,N){
   while(words.length&&words[words.length-1].type==="blank") words.pop();
   board.buttons=withTopicsPage(words,folders,N);
 }
+function topicsGrouped(board,N){
+  const bt=board.buttons, fi=bt.findIndex(b=>b.type==="folder");
+  if(fi<0) return true;
+  if(bt.slice(fi).some(b=>b.type!=="folder")) return false;
+  if(!N) return true;
+  let last=fi-1; while(last>=0&&bt[last].type==="blank") last--;
+  return fi%N===0 && fi-(last+1)<N;
+}
+function ensureHomeTopics(){
+  const h=state.boards.home, N=boardLayout(h);
+  if(!topicsGrouped(h,N)){ groupTopics(h,N); save(); }
+}
 function canAutoArrange(){
   const fresh=starter().home.buttons.map(b=>b.label).join("|");
   const cur=state.boards.home.buttons.filter(b=>b.type!=="blank").map(b=>b.label).filter(l=>l!=="My Words").join("|");
@@ -1545,7 +1555,7 @@ function goalPlanHTML(c){
   return `<div class="recbox"><h3>🎯 Goal-driven starting page</h3>
    <p class="hint">${gl.length?`Ranked from the goals and situations you chose: <b>${esc(gl.join(", "))}</b>.`:"No goals chosen, so common core words are used."} Page 1 always keeps a word for each of requesting, refusing, asking, commenting, feelings and help — priorities add emphasis, they never hide words.</p>
    <div class="firstwords">${p.page1.map(x=>`<span title="${esc(x.why.join("; "))}">${x.b.sym||""} ${esc(x.b.label)} <small style="font-weight:400;color:var(--muted)">· ${esc(x.why[0])}</small></span>`).join("")}</div>
-   <p class="hint">${c.arrange?`Home will start with these ${p.size} words, then the rest of the core words, then a <b>Topics</b> page with the category folders (${esc(p.folders.map(f=>f.label).join(", "))}).`:`Home already has learned positions, so nothing is moved. To arrange Home around these goals, choose it in <b>Adjust settings</b>.`}</p></div>`;
+   <p class="hint">${c.arrange?`Home will start with these ${p.size} words, then the rest of the core words, then the <b>Topics</b> page with the category folders (${esc(p.folders.map(f=>f.label).join(", "))}).`:`Home already has learned word positions, so words are not moved. To arrange Home around these goals, choose it in <b>Adjust settings</b>. Topic folders stay on Home's Topics page either way.`}</p></div>`;
 }
 
 /* ---- the rules (R01–R14) ---- */
@@ -1648,7 +1658,7 @@ function buildConfig(override){
   if(ip==="typing"&&(val(a,"literacy_experience")||[]).includes("not_yet")) R("R14","Typing was chosen and letters haven't been explored yet — that's fine. Typing stays available; no literacy gate is applied.");
   if(override) Object.assign(cfg,override);
   // Goal-driven start (TB-G)
-  cfg.plan=goalPlan(a,state.boards,cfg.layout); cfg.arrange=canAutoArrange(); cfg.groupTopics=cfg.arrange;
+  cfg.plan=goalPlan(a,state.boards,cfg.layout); cfg.arrange=canAutoArrange();
   R("Goals",cfg.arrange?`Home page 1 is filled from the child's goals and situations (${GV}), with a guaranteed word for each communication function; topic folders move to their own Topics page.`:"Home already has learned button positions, so the goal ranking is shown but nothing is moved unless you choose it in Adjust settings.");
   cfg.reviews=[...cfg.reviews];
   return cfg;
@@ -1704,8 +1714,7 @@ function adjustHTML(){
   <div class="row"><label><input type="checkbox" id="adProtect" ${state.settings.protect?"checked":""}> Communication-only mode (hide Edit)</label></div>
   <h3>Home arrangement</h3>
   <div class="row"><label><input type="checkbox" id="adArrange" ${c.arrange?"checked":""}> Arrange Home around the child's goals (page 1 from the goal ranking)</label></div>
-  <div class="row"><label><input type="checkbox" id="adTopics" ${c.groupTopics||c.arrange?"checked":""}> Put topic folders on their own last Home page (“Topics”)</label></div>
-  <p class="hint">${canAutoArrange()?"Home is still the starter layout, so arranging it is safe.":"⚠️ These move buttons the child may have learned. Choose them only on purpose."}</p>
+  <p class="hint">${canAutoArrange()?"Home is still the starter layout, so arranging it is safe.":"⚠️ This moves words the child may have learned. Choose it only on purpose."} Topic folders always sit on Home's own Topics page.</p>
   <h3>Vocabulary</h3>
   <div class="row"><label><input type="radio" name="adVoc" value="add" ${c.vocab_action!=="replace"?"checked":""}> Keep current boards and add personal words (button locations kept)</label></div>
   <div class="row"><label><input type="radio" name="adVoc" value="replace" ${c.vocab_action==="replace"?"checked":""}> Start again from the TalkBoard starter vocabulary + personal words</label></div>
@@ -1715,7 +1724,7 @@ function readAdjust(){
   const c=iw.cfg; if(!c||!$("adInput")) return;
   c.input_style=$("adInput").value; c.input_unconfirmed=false; const L=$("adLayout").value; c.layout=L==="all"?"all":+L;
   c.gap=+$("adGap").value; c.symScale=+$("adSym").value; c.theme=$("adTheme").value; c.speakEach=$("adSpeak").checked; c.calm=$("adCalm").checked; c.highlight=$("adHi").checked;
-  c.arrange=$("adArrange").checked; c.groupTopics=$("adTopics").checked||c.arrange;
+  c.arrange=$("adArrange").checked;
   c.scan=$("adScan").checked; c.protect=$("adProtect").checked; c.vocab_action=document.querySelector("input[name=adVoc]:checked").value; c.adjusted=true;
   c.plan=goalPlan(iw.a,c.vocab_action==="replace"?starter():state.boards,c.layout);
 }
@@ -1749,7 +1758,7 @@ function saveProfile(status,c){
     output:c?{input_style:c.input_style,access_method:c.access_method,layout_id:c.layout,layout_confirmed:c.layout_confirmed,
       display_preferences:{gap:c.gap,symScale:c.symScale,theme:c.theme,calm:c.calm,highlight:c.highlight},languages:c.languages,voice_ids:c.voices,
       vocabulary_additions:c.additions,
-      goal_plan:c.plan?{version:GV,goals:c.plan.goals,page1:c.plan.page1.map(x=>({label:x.b.label,score:x.score,why:x.why})),applied:!!c.arrange,topics_page:!!(c.groupTopics||c.arrange)}:null,feedback_settings:{speakEach:c.speakEach,vibrate:c.vibrate&&c.checks.vibration==="supported",rate:c.rate},
+      goal_plan:c.plan?{version:GV,goals:c.plan.goals,page1:c.plan.page1.map(x=>({label:x.b.label,score:x.score,why:x.why})),applied:!!c.arrange,topics_page:true}:null,feedback_settings:{speakEach:c.speakEach,vibrate:c.vibrate&&c.checks.vibration==="supported",rate:c.rate},
       partner_guidance:c.guidance,review_suggestions:c.reviews,recommendation_reasons:c.reasons,unknowns:c.unknowns}:null,
     checks,reviews_followup:(state.profile&&state.profile.reviews_followup)||[]};
   save();
@@ -1769,7 +1778,6 @@ function applyConfig(c){
   if(c.vocab_action==="replace"){ state.boards=starter(); Object.keys(pageOf).forEach(k=>delete pageOf[k]); }
   addPersonalWords(state.boards,c.additions);
   if(c.arrange){ const plan=goalPlan(iw.a,state.boards,c.layout); state.boards.home.buttons=homeFromPlan(plan,c.layout); c.plan=plan; }
-  else if(c.groupTopics) groupTopics(state.boards.home,c.layout);
   Object.keys(pageOf).forEach(k=>delete pageOf[k]);
   Object.assign(S,{layout:c.layout,gap:c.gap,symScale:c.symScale,theme:c.theme,speakEach:c.speakEach,calm:c.calm,highlight:c.highlight,
     vibrate:!!(c.vibrate&&c.checks.vibration==="supported"),scan:!!(c.scan&&c.checks.switch==="passed"),inputStyle:c.input_style,rate:c.rate||S.rate});
