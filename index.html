@@ -257,6 +257,7 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <div class="row"><label>Button does</label>
     <select id="eType"><option value="word">Add word to message</option><option value="folder">Open a folder</option><option value="speak">Speak now (quick phrase)</option></select></div>
   <div class="row" id="eTargetRow"><label>Folder</label><select id="eTarget"></select></div>
+  <div class="row" id="eNextRow"><label>Then open topic</label><select id="eNext"></select></div>
   <div class="row" id="eTplRow"><label>New folder template</label><select id="eTpl"></select></div>
   <p class="hint" id="eTplHint">The new folder starts with this many empty spaces per page. Open it in Edit mode and tap a space to fill it.</p>
   <div class="row"><label>Move to another board</label><select id="eMove"></select></div>
@@ -301,6 +302,7 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <div class="row"><label>Labels</label><select id="sLabels"><option value="bottom">Below symbol</option><option value="top">Above symbol</option><option value="none">Hidden</option></select></div>
   <div class="row"><label>Message input</label><select id="sInput"><option value="symbols">Pictures with words</option><option value="text">Typing first</option><option value="mixed">Mix of both</option></select></div>
   <div class="row"><label><input type="checkbox" id="sCalm"> Minimal motion</label> <label><input type="checkbox" id="sHi"> Clear highlighting</label></div>
+  <div class="row"><label><input type="checkbox" id="sAutoTopic"> Open the matching topic after a word (e.g. “eat” or typing “food” opens Food)</label></div>
   <div class="row"><label><input type="checkbox" id="sHomeAfter"> Return to Home after choosing a word in a folder</label></div>
   <h3>Access</h3>
   <div class="row"><label>Hold to select (ms) <span id="sHoldV"></span></label><input type="range" id="sHold" min="0" max="2000" step="100"></div>
@@ -488,7 +490,7 @@ function orientDims(n){
 }
 const tplName=n=>n==1?"1 button":n+" buttons";
 
-const DEFAULT_SETTINGS={volume:1,calm:false,highlight:false,vibrate:false,inputStyle:"symbols",voicePerLang:{},lang:"",accent:"",layout:"all",gap:8,symScale:1,protect:false,voice:"",rate:0.95,pitch:1,speakEach:true,clearAfter:false,cols:6,theme:"light",labels:"bottom",
+const DEFAULT_SETTINGS={autoTopic:true,volume:1,calm:false,highlight:false,vibrate:false,inputStyle:"symbols",voicePerLang:{},lang:"",accent:"",layout:"all",gap:8,symScale:1,protect:false,voice:"",rate:0.95,pitch:1,speakEach:true,clearAfter:false,cols:6,theme:"light",labels:"bottom",
   homeAfter:false,hold:0,deb:0,scan:false,scanMs:1500,lock:false,code:""};
 
 const firstRun=!store.get(KEY);
@@ -632,6 +634,24 @@ function speakMessage(){
 function renderMsg(){
   msgEl.innerHTML=message.map(w=>`<div class="chip ${w.letters?"letters":""} ${w.cat?"cat-"+w.cat:""}">${w.img?`<img src="${w.img}" alt="">`:w.sym?`<span class="s">${w.sym}</span>`:""}<span class="t">${esc(w.label)}</span></div>`).join("");
   msgEl.scrollLeft=msgEl.scrollWidth;
+}
+/* Words that open a topic next (e.g. "I want eat" → Food). Buttons can also have their own link (b.next). */
+const TOPIC_LINKS={eat:"food",food:"food",hungry:"food",snack:"food",breakfast:"food",lunch:"food",dinner:"food",
+  drink:"drinks",drinks:"drinks",thirsty:"drinks",feel:"feelings",feelings:"feelings",feeling:"feelings",
+  go:"places",places:"places",place:"places",play:"things",toy:"things",toys:"things",things:"things",
+  people:"people",who:"people",friend:"people",hurts:"body",hurt:"body",body:"body",
+  day:"days",days:"days",month:"months",months:"months",when:"days",number:"numbers",numbers:"numbers",how_many:"numbers",
+  chat:"chat",say:"chat"};
+function linkFor(word,btn){
+  if(btn&&btn.next!==undefined) return btn.next&&state.boards[btn.next]?btn.next:null; // a button's own setting wins ("" = never)
+  const t=TOPIC_LINKS[String(word||"").toLowerCase().replace(/[^a-z_]/g,"")];
+  return t&&state.boards[t]?t:null;
+}
+function openTopic(t){
+  if(!t||!state.settings.autoTopic||editing) return false;
+  if(path[path.length-1]===t) return false;
+  path=["home",t]; pageOf[t]=0; setView("board");
+  return true;
 }
 function addWord(b){message.push({label:b.label,sym:b.sym,img:b.img,speak:b.speak,cat:b.cat});renderMsg();}
 
@@ -792,6 +812,7 @@ function activate(b){
   }
   if(b.type==="speak"){ say(b.speak||b.label); return; }
   addWord(b); if(state.settings.speakEach) say(b.speak||b.label);
+  if(openTopic(linkFor(b.label,b))) return; // e.g. "eat" opens Food
   if(state.settings.homeAfter && path.length>1){path=["home"];pageOf.home=0;renderBoard();}
 }
 
@@ -846,16 +867,18 @@ function renderKbd(){
   $("pred").innerHTML=`<button data-p="__typed" style="flex:2;text-align:left;padding:0 14px;font-size:1.3rem">${esc(typed)||'<span style="color:var(--muted)">Type here…</span>'}</button>`+
     predictions().map(w=>`<button data-p="${esc(w)}">${esc(w)}</button>`).join("");
 }
-function commitTyped(){
+function commitTyped(goTopic){
   const t=typed.trim(); if(!t)return;
-  t.split(/\s+/).forEach(w=>message.push({label:w,letters:true}));
+  const words=t.split(/\s+/);
+  words.forEach(w=>message.push({label:w,letters:true}));
   typed=""; renderMsg(); renderKbd();
+  if(goTopic!==false){ const last=[...words].reverse().map(w=>linkFor(w)).find(Boolean); if(last) openTopic(last); }
 }
 $("keys").addEventListener("click",e=>{
   const k=e.target.closest("button")?.dataset.k; if(k==null)return;
   if(k==="BKSP") typed=typed.slice(0,-1);
   else if(k==="ADD") {commitTyped();return;}
-  else if(k==="SAY") {commitTyped();speakMessage();return;}
+  else if(k==="SAY") {commitTyped(false);speakMessage();return;}
   else if(k===" "){ if(typed.trim()){commitTyped();return;} }
   else typed+= (typed===""||typed.endsWith(" "))?k:k.toLowerCase();
   renderKbd();
@@ -878,7 +901,7 @@ document.addEventListener("keydown",e=>{
   if(/^[a-zA-Z',.?!]$/.test(e.key)){ typed+=(typed===""||typed.endsWith(" "))?e.key.toUpperCase():e.key.toLowerCase(); renderKbd(); e.preventDefault(); }
   else if(e.key==="Backspace"){ typed=typed.slice(0,-1); renderKbd(); e.preventDefault(); }
   else if(e.key===" "){ if(typed.trim()) commitTyped(); e.preventDefault(); }
-  else if(e.key==="Enter"){ commitTyped(); speakMessage(); e.preventDefault(); }
+  else if(e.key==="Enter"){ commitTyped(false); speakMessage(); e.preventDefault(); }
 });
 /* ====================== Top bar actions ====================== */
 $("bSpeak").onclick=speakMessage;
@@ -953,6 +976,7 @@ $("eSymFind").oninput=renderEmojis;
 $("eEmojis").onclick=e=>{const b=e.target.closest("[data-e]");if(b)$("eSym").value=b.dataset.e;};
 $("eType").onchange=()=>{
   const f=$("eType").value==="folder";
+  $("eNextRow").style.display=$("eType").value==="word"?"flex":"none";
   $("eTargetRow").style.display=f?"flex":"none";
   const nw=f&&$("eTarget").value==="__new";
   $("eTplRow").style.display=nw?"flex":"none"; $("eTplHint").style.display=nw?"block":"none";
@@ -968,6 +992,8 @@ function openEditor(b,isNew){
   editCat=b.cat||"misc";renderSw();
   $("eType").value=(b.type&&b.type!=="blank")?b.type:"word";fillTargets(b.target);$("eType").onchange();
   $("eHidden").checked=!!b.hidden;
+  $("eNext").innerHTML=`<option value="__auto">Automatic${TOPIC_LINKS[(b.label||"").toLowerCase()]&&state.boards[TOPIC_LINKS[(b.label||"").toLowerCase()]]?` (${esc(state.boards[TOPIC_LINKS[b.label.toLowerCase()]].name)})`:" (none)"}</option><option value="">Never</option>`+Object.entries(state.boards).filter(([k])=>k!=="home").map(([k,x])=>`<option value="${k}">${esc(x.name)}</option>`).join("");
+  $("eNext").value=b.next===undefined?"__auto":b.next;
   $("eMove").innerHTML='<option value="">Keep on this board</option>'+Object.entries(state.boards).filter(([k])=>k!==curId()).map(([k,x])=>`<option value="${k}">${esc(x.name)}</option>`).join("");
   $("eMove").parentElement.style.display=isNew?"none":"flex";
   $("eDel").style.display=isNew?"none":"inline-block";
@@ -1011,6 +1037,7 @@ $("eSave").onclick=async()=>{
     b.target=t;
   } else delete b.target;
   if(b.type==="speak" && !b.speak) b.speak=label;
+  { const nx=$("eNext").value; if(b.type==="word"&&nx!=="__auto") b.next=nx; else delete b.next; }
   if(editRef.isNew) curBoard().buttons.push(b);
   const mv=$("eMove").value;
   if(!editRef.isNew && mv && state.boards[mv]){
@@ -1028,7 +1055,7 @@ const S=state.settings;
 function openSettings(){
   loadVoices();
   $("sRate").value=S.rate;$("sPitch").value=S.pitch;$("sSpeakEach").checked=S.speakEach;$("sClearAfter").checked=S.clearAfter;
-  $("sLayout").value=String(S.layout);$("sCols").value=S.cols;$("sTheme").value=S.theme;$("sLabels").value=S.labels;$("sHomeAfter").checked=S.homeAfter;
+  $("sLayout").value=String(S.layout);$("sCols").value=S.cols;$("sTheme").value=S.theme;$("sLabels").value=S.labels;$("sHomeAfter").checked=S.homeAfter;$("sAutoTopic").checked=S.autoTopic!==false;
   $("sHold").value=S.hold;$("sDeb").value=S.deb;$("sScan").checked=S.scan;$("sScanMs").value=S.scanMs;
   $("sVol").value=S.volume??1;$("sVib").checked=!!S.vibrate;$("sInput").value=S.inputStyle||"symbols";$("sCalm").checked=!!S.calm;$("sHi").checked=!!S.highlight;renderProfilePanel();
   $("sGap").value=S.gap;$("sSym").value=S.symScale;$("sProtect").checked=S.protect;
@@ -1043,7 +1070,7 @@ function syncLabels(){
 document.querySelectorAll("#oSet input,#oSet select").forEach(el=>el.addEventListener("input",()=>{
   syncLabels();
   Object.assign(S,{volume:+$("sVol").value,vibrate:$("sVib").checked,inputStyle:$("sInput").value,calm:$("sCalm").checked,highlight:$("sHi").checked,gap:+$("sGap").value,symScale:+$("sSym").value,protect:$("sProtect").checked,layout:$("sLayout").value,voice:$("sVoice").value,rate:+$("sRate").value,pitch:+$("sPitch").value,speakEach:$("sSpeakEach").checked,
-    clearAfter:$("sClearAfter").checked,cols:+$("sCols").value,theme:$("sTheme").value,labels:$("sLabels").value,homeAfter:$("sHomeAfter").checked,
+    clearAfter:$("sClearAfter").checked,cols:+$("sCols").value,theme:$("sTheme").value,labels:$("sLabels").value,homeAfter:$("sHomeAfter").checked,autoTopic:$("sAutoTopic").checked,
     hold:+$("sHold").value,deb:+$("sDeb").value,scan:$("sScan").checked,scanMs:+$("sScanMs").value,lock:$("sLock").checked,code:$("sCode").value.trim()});
   applyLook(); save(); if(view==="board") renderBoard();
 }));
