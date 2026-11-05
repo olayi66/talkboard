@@ -1866,6 +1866,21 @@ function openFollowUp(){
   $("wSkip").onclick=()=>{ hide("oWiz"); $("wNext").onclick=()=>iwGo(1); $("wSkip").onclick=()=>{ saveProfile("Draft",iw.cfg||buildConfig()); hide("oWiz"); toast("Saved as a draft. Nothing was changed."); }; };
 }
 
+/* ---- Tap outside a pop-up window to close it (not the questionnaire, so answers aren't lost by accident) ---- */
+const OUTSIDE_CLOSE={oSet:"sClose",oEdit:"eCancel",oHist:"hClose",oLayout:"lCancel",oAsk:"aNo",oPrint:"prClose"};
+let downOnBackdrop=null;
+document.addEventListener("pointerdown",e=>{ downOnBackdrop=(e.target.classList&&e.target.classList.contains("overlay"))?e.target:null; },true);
+document.addEventListener("click",e=>{
+  const o=e.target;
+  if(!o.classList||!o.classList.contains("overlay")||o!==downOnBackdrop) return; // only a tap that starts and ends on the dimmed area
+  const btn=OUTSIDE_CLOSE[o.id]; if(btn&&$(btn)) $(btn).click();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape") return;
+  const open=[...document.querySelectorAll(".overlay.show")].pop(); if(!open) return;
+  const btn=OUTSIDE_CLOSE[open.id]; if(btn&&$(btn)){ e.preventDefault(); $(btn).click(); }
+});
+
 /* ====================== Init ====================== */
 buildKeys(); applyLook(); renderBoard(); renderMsg();
 try{ if("serviceWorker" in navigator && /^https?:/.test(location.protocol) && document.querySelector('link[rel=manifest]')) navigator.serviceWorker.register("sw.js").catch(()=>{}); }catch(e){}
