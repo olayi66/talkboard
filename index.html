@@ -672,7 +672,11 @@ function renderBoard(){
     grid.style.gridAutoRows="";
   }else{
     if(editing) items.push({add:true,idx:items.length});
-    pageCount=1; pageOf[id]=0; slice=items;
+    const hasFolders=id==="home"&&bd.buttons.some(b=>b.type==="folder");
+    if(hasFolders){ // Home: core words screen, then the Topics screen
+      const words=items.filter(it=>it.add||!it.b||it.b.type!=="folder"), folders=items.filter(it=>it.b&&it.b.type==="folder");
+      pageCount=2; pageOf[id]=Math.min(pageOf[id]||0,1); slice=pageOf[id]===0?words:folders;
+    } else { pageCount=1; pageOf[id]=0; slice=items; }
     grid.style.gridTemplateColumns=`repeat(${S.cols},1fr)`;
     grid.style.gridTemplateRows=""; grid.style.gridAutoRows="1fr";
   }
@@ -685,6 +689,7 @@ function renderBoard(){
   // Topics page: a Home page holding only topic folders
   let topicsPage=-1;
   if(id==="home"&&N){ const fi=bd.buttons.findIndex(b=>b.type==="folder"); if(fi>=0&&bd.buttons.slice(Math.floor(fi/N)*N,fi).every(b=>b.type==="blank")) topicsPage=Math.floor(fi/N); }
+  if(id==="home"&&!N&&bd.buttons.some(b=>b.type==="folder")) topicsPage=1;
   const onTopics=topicsPage>=0&&pg>=topicsPage;
   if(onTopics){ $("crumb").textContent="Home › Topics"; $("pPrevL").textContent=$("pNextL").textContent=`Topics · ${pg+1}/${pageCount}`; }
   $("nTopics").style.display=topicsPage>=0&&view==="board"&&!onTopics?"":"none";
@@ -787,7 +792,7 @@ function activate(b){
   }
   if(b.type==="speak"){ say(b.speak||b.label); return; }
   addWord(b); if(state.settings.speakEach) say(b.speak||b.label);
-  if(state.settings.homeAfter && path.length>1){path=["home"];renderBoard();}
+  if(state.settings.homeAfter && path.length>1){path=["home"];pageOf.home=0;renderBoard();}
 }
 
 /* ---- Pointer handling: hold-to-select + debounce ---- */
@@ -880,7 +885,7 @@ $("bSpeak").onclick=speakMessage;
 msgEl.onclick=speakMessage;
 $("bBack").onclick=()=>{ if(view==="kbd"&&typed){typed=typed.slice(0,-1);renderKbd();return;} message.pop();renderMsg(); };
 $("bClear").onclick=()=>{message=[];typed="";renderMsg();if(view==="kbd")renderKbd();try{speechSynthesis.cancel()}catch(e){}};
-$("nHome").onclick=()=>{path=["home"];setView("board");};
+$("nHome").onclick=()=>{path=["home"];pageOf.home=0;setView("board");};
 $("nBackBoard").onclick=()=>{if(path.length>1)path.pop();setView("board");};
 $("nKbd").onclick=()=>setView(view==="kbd"?"board":"kbd");
 $("nHist").onclick=()=>{renderHist();show("oHist");};
