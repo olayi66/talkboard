@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TalkBoard">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#1f3b57">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>TalkBoard AAC</title>
+<style>
+:root{
+  --bg:#eef2f6; --panel:#ffffff; --ink:#18222d; --muted:#5d6b7a; --line:#d5dde6;
+  --brand:#1f3b57; --accent:#2f7de1;
+  --c-pronoun:#ffe58a; --c-verb:#b9eab0; --c-describe:#b8d8ff; --c-noun:#ffd0a6;
+  --c-social:#ffc6dd; --c-question:#dcc8ff; --c-negate:#ffb3ad; --c-misc:#ffffff; --c-folder:#e3e8ee;
+  --gap:8px; --radius:14px; --cols:6;
+}
+:root{--pc-pronoun:#ffe58a;--pc-verb:#b9eab0;--pc-describe:#b8d8ff;--pc-noun:#ffd0a6;--pc-social:#ffc6dd;--pc-question:#dcc8ff;--pc-negate:#ffb3ad;--pc-misc:#fff;--pc-folder:#e3e8ee}
+body.dark,.pv-dark{
+  --bg:#121820; --panel:#1c2530; --ink:#eef3f8; --muted:#9fb0c2; --line:#2e3a48; --brand:#0d1a27;
+  --c-pronoun:#6b5a12; --c-verb:#2c5a26; --c-describe:#1f4670; --c-noun:#6e4120;
+  --c-social:#6a2a45; --c-question:#47307a; --c-negate:#7a2a24; --c-misc:#2a3644; --c-folder:#323e4c;
+}
+body.contrast,.pv-contrast{
+  --bg:#000; --panel:#000; --ink:#fff; --muted:#fff; --line:#fff; --brand:#000;
+  --c-pronoun:#ffd400; --c-verb:#00c853; --c-describe:#2196f3; --c-noun:#ff8f00;
+  --c-social:#ff4fa0; --c-question:#9c6bff; --c-negate:#ff3b30; --c-misc:#fff; --c-folder:#bbb;
+}
+body.contrast .cell{color:#000;border:3px solid #fff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{height:100vh;height:100dvh}
+input,select,textarea{font-size:16px} /* stops iOS zooming into fields */
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);
+  display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-touch-callout:none}
+.cell,.barbtn,.pager{-webkit-touch-callout:none}
+
+/* ---------- message bar ---------- */
+#msgbar{display:flex;gap:var(--gap);padding:var(--gap);background:var(--brand);align-items:stretch}
+#msg{flex:1;min-height:84px;background:var(--panel);border-radius:var(--radius);display:flex;align-items:center;
+  gap:6px;padding:6px 10px;overflow-x:auto;cursor:pointer;border:3px solid transparent}
+#msg:empty::before{content:"Tap symbols to build a message";color:var(--muted);font-size:1.05rem}
+.chip{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:56px;padding:2px 6px;
+  border-radius:10px;flex-shrink:0}
+.chip .s{font-size:1.9rem;line-height:1}
+.chip .t{font-size:.9rem;font-weight:600;white-space:nowrap}
+.chip.letters .t{font-size:1.3rem}
+.chip.speaking{outline:3px solid var(--accent)}
+.barbtn{min-width:78px;border:none;border-radius:var(--radius);background:#ffffff22;color:#fff;font-weight:700;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:.85rem;padding:4px}
+.barbtn .i{font-size:1.7rem;line-height:1}
+.barbtn.speak{background:#2fbf71}
+body.contrast .barbtn{border:2px solid #fff}
+
+/* ---------- nav row ---------- */
+#nav{display:flex;gap:var(--gap);padding:var(--gap) var(--gap) 0;align-items:center;flex-wrap:nowrap;overflow-x:auto}
+.navbtn{border:2px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 12px;font-weight:600;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:.95rem}
+.navbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+#crumb{font-weight:700;font-size:1.1rem;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:60px}
+#editBadge{display:none;background:#e8a400;color:#000;border-radius:8px;padding:4px 10px;font-weight:800;font-size:.85rem}
+body.editing #editBadge{display:inline-block}
+
+/* ---------- grid ---------- */
+#main{flex:1;min-height:0;padding:var(--gap);display:flex;flex-direction:row;gap:var(--gap)}
+#wrap{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.pager{width:72px;flex-shrink:0;border:2px solid var(--line);background:var(--panel);border-radius:var(--radius);
+  font-size:2.2rem;font-weight:800;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.pager small{font-size:.85rem;color:var(--muted)}
+.pager:disabled{opacity:.3}
+body.paged .pager{display:flex}
+#grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(var(--cols),1fr);grid-auto-rows:1fr;gap:var(--gap)}
+.cell.pad{visibility:hidden}
+body.editing .cell.pad{visibility:visible}
+.cell.blank-slot{background:transparent;border:2px dashed var(--line);box-shadow:none}
+body:not(.editing) .cell.blank-slot{visibility:hidden}
+@media (max-width:640px){
+  .nt{display:none} .navbtn{padding:8px 10px;font-size:1.15rem}
+  .pager{width:46px;font-size:1.6rem} .pager small{font-size:.7rem}
+  .barbtn{min-width:58px;font-size:.75rem} #msg{min-height:72px}
+  body.editing #editBadge{display:none} #crumb{min-width:0;font-size:.95rem}
+  body.editing #nEdit{background:#e8a400;border-color:#e8a400;color:#000}
+}
+#nLayout{display:none}
+body.editing .cell{touch-action:none;cursor:grab}
+.cell.dragging{opacity:.25}
+.cell.drop-hi{outline:5px solid var(--accent) !important;outline-offset:-4px;transform:scale(1.03)}
+.pager.drop-hi{outline:5px solid var(--accent)}
+#ghost{position:fixed;z-index:70;pointer-events:none;opacity:.92;transform:scale(1.08) rotate(-2deg);box-shadow:0 12px 30px #0006;border-radius:var(--radius)}
+.cell img.ph{max-width:92%;max-height:calc(var(--sym,3rem) * 1.35);object-fit:contain;border-radius:8px;pointer-events:none}
+.chip img{height:34px;border-radius:6px}
+body.protect:not(.editing) #nEdit{display:none}
+#ePhotoPrev{max-height:70px;border-radius:8px;display:none}
+/* intake wizard */
+.dlg.wiz{max-width:760px;min-height:min(640px,92vh);display:flex;flex-direction:column}
+.wizTop{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-weight:700}
+.wizBar{height:8px;background:var(--bg);border-radius:6px;margin:10px 0 16px;overflow:hidden}
+.wizBar i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+#wBody{flex:1}
+#wBody h2{font-size:1.45rem;margin:0 0 6px}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:14px}
+.opt{border:3px solid var(--line);background:var(--bg);border-radius:14px;padding:12px;text-align:left;display:flex;gap:10px;align-items:flex-start}
+.opt .oi{font-size:2rem;line-height:1}
+.opt b{display:block;font-size:1.02rem}
+.opt small{color:var(--muted);display:block;margin-top:2px}
+.opt.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel))}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chipb{border:2px solid var(--line);background:var(--bg);border-radius:999px;padding:8px 12px;font-weight:600}
+.chipb.on{border-color:var(--accent);background:var(--accent);color:#fff}
+.recbox{background:var(--bg);border-radius:14px;padding:12px 14px;margin:10px 0}
+.recbox h3{margin:0 0 6px;color:var(--ink);text-transform:none;letter-spacing:0;font-size:1.05rem}
+.recbox ul{margin:4px 0 0;padding-left:20px} .recbox li{margin:3px 0}
+.firstwords{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.firstwords span{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:4px 8px;font-weight:700}
+body.calm *,body.calm *::before,body.calm *::after{transition:none !important;animation:none !important}
+body.calm .cell:active{transform:none}
+body.highlight .cell:active,body.highlight .cell:focus-visible{outline:6px solid var(--accent);outline-offset:-4px}
+.rtab{width:100%;border-collapse:collapse;margin:8px 0;font-size:.95rem}
+.rtab th,.rtab td{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
+.rtab th{width:28%;color:var(--muted)}
+.opt.gen{padding:8px 10px} .opt.gen .oi{font-size:1.4rem}
+.pv-dark .cell,.pv-contrast .cell{color:var(--ink)} .pv-contrast{--ink:#000} .pv-contrast .cell{border:3px solid #fff}
+.pv-dark{--ink:#eef3f8;background:#121820 !important} .pv-contrast{background:#000 !important}
+/* print view */
+#oPrint{background:var(--bg);display:none;align-items:stretch;padding:0;z-index:55}
+#oPrint.show{display:flex;flex-direction:column}
+#printBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px;background:var(--panel);border-bottom:2px solid var(--line)}
+#printArea{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.sheet{background:#fff;color:#111;width:1000px;max-width:100%;aspect-ratio:11/8.5;padding:22px;box-shadow:0 2px 12px #0003;display:flex;flex-direction:column;gap:8px}
+.sheet h4{margin:0;font-size:22px;display:flex;justify-content:space-between}
+.sheet h4 small{font-weight:400;font-size:13px;color:#555}
+.pgrid{flex:1;display:grid;gap:6px;min-height:0}
+.pcell{border:2px solid #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:4px;text-align:center}
+.pcell .s{line-height:1.15} .pcell .t{font-weight:700;line-height:1.1;margin-top:4px}
+.pcell img{max-width:90%;object-fit:contain}
+.pcell .go{font-size:11px;color:#444}
+.sheet.nocolor .pcell{background:#fff !important}
+@page{size:letter landscape;margin:8mm}
+@media print{
+  body{overflow:visible;height:auto;display:block;background:#fff}
+  body>*:not(#oPrint){display:none !important}
+  #oPrint{position:static;display:block !important;background:#fff}
+  #printBar{display:none}
+  #printArea{display:block;padding:0;overflow:visible}
+  .sheet{width:100%;box-shadow:none;padding:0;height:190mm;aspect-ratio:auto;page-break-after:always;break-after:page}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+} body.editing #nLayout{display:flex}
+.cell{position:relative;border:2px solid #00000018;border-radius:var(--radius);background:var(--c-misc);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;overflow:hidden;
+  box-shadow:0 2px 0 #00000014;transition:transform .06s}
+.cell:active{transform:scale(.96)}
+.cell .s{font-size:var(--sym,clamp(1.6rem,5.2vmin,3.6rem));line-height:1.05}
+.cell .t{font-size:var(--lbl,clamp(.8rem,2.3vmin,1.35rem));font-weight:700;text-align:center;line-height:1.1;margin-top:3px;word-break:break-word}
+body.nolabels .cell .t{display:none}
+body.labeltop .cell{flex-direction:column-reverse}
+body.labeltop .cell .t{margin:0 0 3px}
+.cell.folder{background:var(--c-folder);border-top:9px solid #8897a8}
+.cell.folder::after{content:"›";position:absolute;right:8px;bottom:2px;font-size:1.4rem;font-weight:800;opacity:.55}
+.cell.empty{background:transparent;border:2px dashed var(--line);box-shadow:none}
+.cell.hidden-btn{opacity:.35}
+.cell .hold{position:absolute;left:0;bottom:0;height:6px;background:var(--accent);width:0}
+.cat-pronoun{background:var(--c-pronoun)} .cat-verb{background:var(--c-verb)} .cat-describe{background:var(--c-describe)}
+.cat-noun{background:var(--c-noun)} .cat-social{background:var(--c-social)} .cat-question{background:var(--c-question)}
+.cat-negate{background:var(--c-negate)} .cat-misc{background:var(--c-misc)}
+body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
+.scan-hi{outline:6px solid #ff2d55 !important;outline-offset:-3px;z-index:2}
+
+/* keyboard */
+#kbd{flex:1;display:none;flex-direction:column;gap:var(--gap);min-height:0}
+#pred{display:flex;gap:var(--gap);min-height:56px}
+#pred button{flex:1;border:2px solid var(--line);background:var(--panel);border-radius:12px;font-size:1.15rem;font-weight:700}
+#keys{flex:1;display:grid;grid-template-columns:repeat(10,1fr);grid-auto-rows:1fr;gap:6px;min-height:0}
+#keys button{border:2px solid var(--line);background:var(--panel);border-radius:10px;font-size:clamp(1rem,3.4vmin,1.8rem);font-weight:700}
+#keys button.wide{grid-column:span 2}
+#keys button.space{grid-column:span 4}
+
+/* ---------- dialogs ---------- */
+.overlay{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:50;padding:12px}
+.overlay.show{display:flex}
+.dlg{background:var(--panel);color:var(--ink);border-radius:18px;max-width:620px;width:100%;max-height:92vh;overflow:auto;padding:18px 20px;box-shadow:0 10px 40px #0006}
+.dlg h2{margin:0 0 12px;font-size:1.3rem}
+.dlg h3{margin:18px 0 8px;font-size:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+.row label{min-width:150px;font-weight:600}
+.row input[type=text],.row select,.row textarea{flex:1;min-width:160px;padding:9px 10px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.row input[type=range]{flex:1}
+.row textarea{min-height:90px;font-family:ui-monospace,monospace;font-size:.8rem}
+.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.b{border:none;border-radius:10px;padding:10px 16px;font-weight:700;background:var(--c-folder);color:var(--ink)}
+.b.primary{background:var(--accent);color:#fff}
+.b.danger{background:#d64545;color:#fff}
+.swatches{display:flex;gap:6px;flex-wrap:wrap}
+.sw{width:44px;height:44px;border-radius:10px;border:3px solid transparent;font-size:.6rem;font-weight:700;display:flex;align-items:end;justify-content:center;padding-bottom:2px}
+.sw.on{border-color:var(--accent)}
+.emojis{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:4px;max-height:170px;overflow:auto;border:2px solid var(--line);border-radius:10px;padding:6px;margin-top:6px}
+.emojis button{border:none;background:transparent;font-size:1.6rem;border-radius:8px;padding:2px}
+.emojis button:hover{background:var(--bg)}
+.hint{color:var(--muted);font-size:.85rem;margin:4px 0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:12px;font-weight:600;display:none;z-index:60}
+#lock{position:fixed;inset:0;z-index:40;display:none}
+</style>
+</head>
+<body>
+
+<div id="msgbar">
+  <div id="msg" role="button" aria-label="Message. Tap to speak."></div>
+  <button class="barbtn speak" id="bSpeak"><span class="i">🔊</span>Speak</button>
+  <button class="barbtn" id="bBack"><span class="i">⌫</span>Delete</button>
+  <button class="barbtn" id="bClear"><span class="i">✖</span>Clear</button>
+</div>
+
+<div id="nav">
+  <button class="navbtn" id="nHome">🏠<span class="nt"> Home</span></button>
+  <button class="navbtn" id="nBackBoard">↩<span class="nt"> Back</span></button>
+  <button class="navbtn" id="nKbd">⌨️<span class="nt"> ABC</span></button>
+  <button class="navbtn" id="nHist">🕘<span class="nt"> Recent</span></button>
+  <div id="crumb">Home</div>
+  <span id="editBadge">EDIT MODE</span>
+  <button class="navbtn" id="nLayout">🔲<span class="nt"> Layout</span></button>
+  <button class="navbtn" id="nEdit">✏️<span class="nt"> Edit</span></button>
+  <button class="navbtn" id="nSet">⚙️</button>
+</div>
+
+<div id="main">
+  <button class="pager" id="pPrev" aria-label="Previous page">◀<small id="pPrevL"></small></button>
+  <div id="wrap">
+    <div id="grid"></div>
+    <div id="kbd">
+      <div id="pred"></div>
+      <div id="keys"></div>
+    </div>
+  </div>
+  <button class="pager" id="pNext" aria-label="Next page">▶<small id="pNextL"></small></button>
+</div>
+
+<!-- Button editor -->
+<div class="overlay" id="oEdit"><div class="dlg">
+  <h2 id="eTitle">Edit button</h2>
+  <div class="row"><label>Label</label><input type="text" id="eLabel" maxlength="40"></div>
+  <div class="row"><label>Spoken as (optional)</label><input type="text" id="eSpeak" placeholder="Same as label"></div>
+  <div class="row"><label>Symbol</label><input type="text" id="eSym" maxlength="8" style="max-width:110px;font-size:1.6rem;text-align:center">
+    <input type="text" id="eSymFind" placeholder="Search symbols (e.g. dog, happy)"></div>
+  <div class="emojis" id="eEmojis"></div>
+  <div class="row"><label>Or use a photo</label><input type="file" id="ePhoto" accept="image/*"><img id="ePhotoPrev" alt=""><button class="b" id="ePhotoDel" type="button">Remove photo</button></div>
+  <p class="hint">Take or choose a photo of a person, place or favourite thing. It is shrunk and kept on this device.</p>
+  <div class="row"><label>Word type / color</label></div>
+  <div class="swatches" id="eSw"></div>
+  <div class="row"><label>Button does</label>
+    <select id="eType"><option value="word">Add word to message</option><option value="folder">Open a folder</option><option value="speak">Speak now (quick phrase)</option></select></div>
+  <div class="row" id="eTargetRow"><label>Folder</label><select id="eTarget"></select></div>
+  <div class="row" id="eTplRow"><label>New folder template</label><select id="eTpl"></select></div>
+  <p class="hint" id="eTplHint">The new folder starts with this many empty spaces per page. Open it in Edit mode and tap a space to fill it.</p>
+  <div class="row"><label>Move to another board</label><select id="eMove"></select></div>
+  <div class="row"><label><input type="checkbox" id="eHidden"> Hide from user</label></div>
+  <p class="hint">Tip: in Edit mode you can also drag any button onto another spot to swap them. Hold it over ◀ ▶ to carry it to another page.</p>
+  <div class="btns">
+    <button class="b danger" id="eDel">Delete</button>
+    <span style="flex:1"></span>
+    <button class="b" id="eCancel">Cancel</button>
+    <button class="b primary" id="eSave">Save</button>
+  </div>
+</div></div>
+
+<!-- Settings -->
+<div class="overlay" id="oSet"><div class="dlg">
+  <h2>Settings</h2>
+  <h3>Voice</h3>
+  <div class="row"><label>Language</label><select id="sLang"></select></div>
+  <div class="row"><label>Accent</label><select id="sAccent"></select></div>
+  <div class="row"><label>Voice</label><select id="sVoice"></select><button class="b" id="sTest" type="button">▶ Test</button></div>
+  <p class="hint" id="sVoiceHint">✈️ = works offline · 🌐 = needs internet. Only languages and accents installed on this device are listed.</p>
+  <details class="hint"><summary>Don't see your language or accent? Add voices on the device</summary>
+    <p><b>Windows 11:</b> Settings → Time &amp; language → Speech → Add voices.<br>
+    <b>iPhone / iPad:</b> Settings → Accessibility → Spoken Content → Voices.<br>
+    <b>Mac:</b> System Settings → Accessibility → Spoken Content → System voice → Manage Voices.<br>
+    <b>Android:</b> Settings → Accessibility → Text-to-speech → Preferred engine → Install voice data.<br>
+    <b>Chromebook:</b> Settings → Accessibility → Text-to-speech → Text-to-speech engine settings.<br>
+    Then close and reopen TalkBoard.</p></details>
+  <div class="row"><label>Speed <span id="sRateV"></span></label><input type="range" id="sRate" min="0.5" max="1.6" step="0.05"></div>
+  <div class="row"><label>Pitch <span id="sPitchV"></span></label><input type="range" id="sPitch" min="0.5" max="1.8" step="0.05"></div>
+  <div class="row"><label>Volume <span id="sVolV"></span></label><input type="range" id="sVol" min="0.1" max="1" step="0.05"></div>
+  <div class="row"><label><input type="checkbox" id="sSpeakEach"> Say each word when tapped</label></div>
+  <div class="row"><label><input type="checkbox" id="sVib"> Light vibration on tap (Android; not supported on iPhone/iPad)</label></div>
+  <div class="row"><label><input type="checkbox" id="sClearAfter"> Clear message after speaking</label></div>
+  <h3>Display</h3>
+  <div class="row"><label>Buttons per page</label><select id="sLayout"></select></div>
+  <p class="hint">Pick a template (for example 2, 4 or 9 buttons) to show fewer, bigger buttons with page arrows. "Show all" fits every button on one screen using the Columns setting. Each board can also have its own template: open it in Edit mode and press Layout.</p>
+  <div class="row"><label>Columns <span id="sColsV"></span></label><input type="range" id="sCols" min="3" max="10" step="1"></div>
+  <div class="row"><label>Space between buttons <span id="sGapV"></span></label><input type="range" id="sGap" min="2" max="30" step="1"></div>
+  <div class="row"><label>Symbol size <span id="sSymV"></span></label><input type="range" id="sSym" min="0.6" max="1.4" step="0.05"></div>
+  <div class="row"><label>Theme</label><select id="sTheme"><option value="light">Light</option><option value="dark">Dark</option><option value="contrast">High contrast</option></select></div>
+  <div class="row"><label>Labels</label><select id="sLabels"><option value="bottom">Below symbol</option><option value="top">Above symbol</option><option value="none">Hidden</option></select></div>
+  <div class="row"><label>Message input</label><select id="sInput"><option value="symbols">Pictures with words</option><option value="text">Typing first</option><option value="mixed">Mix of both</option></select></div>
+  <div class="row"><label><input type="checkbox" id="sCalm"> Minimal motion</label> <label><input type="checkbox" id="sHi"> Clear highlighting</label></div>
+  <div class="row"><label><input type="checkbox" id="sHomeAfter"> Return to Home after choosing a word in a folder</label></div>
+  <h3>Access</h3>
+  <div class="row"><label>Hold to select (ms) <span id="sHoldV"></span></label><input type="range" id="sHold" min="0" max="2000" step="100"></div>
+  <div class="row"><label>Ignore repeat taps (ms) <span id="sDebV"></span></label><input type="range" id="sDeb" min="0" max="1500" step="100"></div>
+  <div class="row"><label><input type="checkbox" id="sScan"> Switch scanning</label></div>
+  <div class="row"><label>Scan speed (ms) <span id="sScanV"></span></label><input type="range" id="sScanMs" min="500" max="4000" step="100"></div>
+  <p class="hint">Scanning: the highlight moves by itself. Press Space, Enter, or a connected switch (or tap anywhere) to choose the highlighted item.</p>
+  <h3>Child profile</h3>
+  <div id="sProfile"></div>
+  <h3>Editing</h3>
+  <div class="row"><label><input type="checkbox" id="sLock"> Require code to enter Edit/Settings</label><input type="text" id="sCode" placeholder="Code, e.g. 1234" style="max-width:150px"></div>
+  <div class="row"><label><input type="checkbox" id="sProtect"> Communication-only mode</label></div>
+  <p class="hint">Hides the Edit button so the person can't change things by accident. To get back here, press and hold the ⚙️ button for 2 seconds.</p>
+  <div class="btns" style="justify-content:flex-start;margin-top:4px"><button class="b" id="sWiz">👤 Child profile questionnaire</button><button class="b" id="sGoEdit">✏️ Edit vocabulary now</button><button class="b" id="sPrint">🖨️ Printable boards</button></div>
+  <h3>Backup &amp; restore</h3>
+  <p class="hint">Copy a backup (all boards, photos and settings) and keep it somewhere safe, such as an email to yourself or a note. On a new or replaced device, paste it here (or choose a saved backup file) and press Restore.</p>
+  <div class="row"><textarea id="sData" placeholder="Paste vocabulary here to import"></textarea></div>
+  <div class="row"><input type="file" id="sFile" accept=".json,.txt,application/json"></div>
+  <div class="btns">
+    <button class="b" id="sCopy">Copy backup</button>
+    <button class="b" id="sImport">Restore</button>
+    <button class="b danger" id="sReset">Reset to starter vocabulary</button>
+    <span style="flex:1"></span>
+    <button class="b primary" id="sClose">Done</button>
+  </div>
+</div></div>
+
+<!-- Code prompt / confirm / history / new folder -->
+<div class="overlay" id="oAsk"><div class="dlg" style="max-width:420px">
+  <h2 id="aTitle"></h2><p id="aText" class="hint"></p>
+  <div class="row" id="aInRow"><input type="text" id="aIn"></div>
+  <div class="btns"><button class="b" id="aNo">Cancel</button><button class="b primary" id="aYes">OK</button></div>
+</div></div>
+
+<div class="overlay" id="oLayout"><div class="dlg" style="max-width:520px">
+  <h2>Layout for this board</h2>
+  <div class="row"><label>Buttons per page</label><select id="lSel"></select></div>
+  <div class="tplpick" id="lPick" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin-top:10px"></div>
+  <div class="row"><label><input type="checkbox" id="lFill"> Add empty spaces so the last page is full</label></div>
+  <div class="btns"><button class="b" id="lCancel">Cancel</button><button class="b primary" id="lSave">Apply</button></div>
+</div></div>
+
+<div class="overlay" id="oHist"><div class="dlg">
+  <h2>Recent messages</h2><div id="hList"></div>
+  <div class="btns"><button class="b" id="hClear">Clear history</button><button class="b primary" id="hClose">Close</button></div>
+</div></div>
+
+<div class="overlay" id="oPrint">
+  <div id="printBar">
+    <strong style="font-size:1.1rem">🖨️ Printable boards</strong>
+    <select id="prWhich" class="b"><option value="all">All boards</option><option value="cur">Current board only</option></select>
+    <select id="prSize" class="b"><option value="0">Same layout as the app</option><option value="12">12 per sheet</option><option value="20">20 per sheet</option><option value="24">24 per sheet</option><option value="32">32 per sheet</option><option value="40">40 per sheet</option></select>
+    <label><input type="checkbox" id="prColor" checked> Colour</label>
+    <span style="flex:1"></span>
+    <button class="b primary" id="prGo">Print</button>
+    <button class="b" id="prClose">Close</button>
+    <p class="hint" style="width:100%;margin:0">Prints on letter paper, sideways. If the print window doesn't open here, open TalkBoard in its own browser tab or the installed app and press Ctrl+P (⌘P on Mac). Lamination keeps paper boards lasting longer.</p>
+  </div>
+  <div id="printArea"></div>
+</div>
+
+<!-- Child profile intake -->
+<div class="overlay" id="oWiz"><div class="dlg wiz">
+  <div class="wizTop"><span id="wStepL"></span><button class="b" id="wSkip">Skip for now</button></div>
+  <div class="wizBar"><i id="wBar"></i></div>
+  <div id="wBody"></div>
+  <div class="btns"><button class="b" id="wBack">◀ Back</button><span style="flex:1"></span><button class="b primary" id="wNext">Next ▶</button></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ====================== Storage (safe) ====================== */
+const KEY="talkboard-aac-v1";
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
+
+/* ====================== Starter vocabulary ====================== */
+/* All symbols are Unicode emoji rendered by the device's own font. */
+let uid=1; const nid=()=> "b"+(Date.now().toString(36))+(uid++);
+const W=(label,sym,cat,speak)=>({id:nid(),type:"word",label,sym,cat:cat||"misc",speak:speak||""});
+const F=(label,sym,target)=>({id:nid(),type:"folder",label,sym,cat:"folder",target});
+const Q=(label,sym,speak)=>({id:nid(),type:"speak",label,sym,cat:"social",speak:speak||label});
+
+function starter(){
+  const b={};
+  b.home={name:"Home",buttons:[
+    W("I","🙋","pronoun"),W("you","👉","pronoun"),W("want","🤲","verb"),W("go","🚶","verb"),W("like","👍","verb"),W("not","🚫","negate"),
+    W("it","📦","pronoun"),W("help","🆘","verb"),W("more","➕","describe"),W("stop","✋","verb"),W("finished","🏁","describe"),W("yes","✅","social"),
+    W("me","🧍","pronoun"),W("eat","🍽️","verb"),W("drink","🥤","verb"),W("play","🧸","verb"),W("feel","💭","verb"),W("no","❌","social"),
+    F("People","👨‍👩‍👧","people"),F("Feelings","😊","feelings"),F("Food","🍎","food"),F("Drinks","🧃","drinks"),F("Places","🏫","places"),F("Questions","❓","questions"),
+    F("Actions","🏃","actions"),F("Describe","🎨","describe"),F("Body","🫀","body"),F("Things","🧩","things"),F("Chat","💬","chat"),F("Numbers","🔢","numbers")
+  ]};
+  b.people={name:"People",buttons:[
+    W("I","🙋","pronoun"),W("you","👉","pronoun"),W("he","👦","pronoun"),W("she","👧","pronoun"),W("we","👫","pronoun"),W("they","👥","pronoun"),
+    W("mom","👩","noun"),W("dad","👨","noun"),W("brother","🧒","noun"),W("sister","👧","noun"),W("grandma","👵","noun"),W("grandpa","👴","noun"),
+    W("teacher","🧑‍🏫","noun"),W("friend","🤝","noun"),W("doctor","🧑‍⚕️","noun"),W("baby","👶","noun"),W("everyone","🌍","pronoun"),W("my","🫵","pronoun")
+  ]};
+  b.feelings={name:"Feelings",buttons:[
+    W("happy","😊","describe"),W("sad","😢","describe"),W("angry","😠","describe"),W("scared","😨","describe"),W("tired","😴","describe"),W("excited","🤩","describe"),
+    W("sick","🤒","describe"),W("hurt","🤕","describe"),W("bored","😑","describe"),W("calm","😌","describe"),W("worried","😟","describe"),W("silly","🤪","describe"),
+    W("frustrated","😤","describe"),W("hungry","😋","describe"),W("thirsty","🥵","describe"),W("hot","🔥","describe"),W("cold","🥶","describe"),W("okay","👌","describe")
+  ]};
+  b.food={name:"Food",buttons:[
+    W("apple","🍎","noun"),W("banana","🍌","noun"),W("grapes","🍇","noun"),W("bread","🍞","noun"),W("sandwich","🥪","noun"),W("pizza","🍕","noun"),
+    W("chicken","🍗","noun"),W("rice","🍚","noun"),W("pasta","🍝","noun"),W("eggs","🥚","noun"),W("cereal","🥣","noun"),W("cheese","🧀","noun"),
+    W("cookie","🍪","noun"),W("chips","🥔","noun"),W("ice cream","🍦","noun"),W("carrot","🥕","noun"),W("soup","🍲","noun"),W("snack","🍿","noun"),
+    W("breakfast","🌅","noun"),W("lunch","🕛","noun"),W("dinner","🌙","noun"),W("yummy","😋","describe"),W("yucky","🤢","describe"),W("hungry","🍽️","describe")
+  ]};
+  b.drinks={name:"Drinks",buttons:[
+    W("water","💧","noun"),W("milk","🥛","noun"),W("juice","🧃","noun"),W("tea","🍵","noun"),W("hot chocolate","☕","noun"),W("smoothie","🥤","noun"),
+    W("cup","🥤","noun"),W("bottle","🍼","noun"),W("straw","🧋","noun"),W("cold","🧊","describe"),W("hot","♨️","describe"),W("thirsty","😮‍💨","describe")
+  ]};
+  b.places={name:"Places",buttons:[
+    W("home","🏠","noun"),W("school","🏫","noun"),W("bathroom","🚻","noun"),W("bedroom","🛏️","noun"),W("kitchen","🍳","noun"),W("outside","🌳","noun"),
+    W("park","🛝","noun"),W("store","🏪","noun"),W("car","🚗","noun"),W("bus","🚌","noun"),W("hospital","🏥","noun"),W("church","⛪","noun"),
+    W("library","📚","noun"),W("playground","🎠","noun"),W("pool","🏊","noun"),W("restaurant","🍴","noun"),W("in","📥","describe"),W("out","📤","describe")
+  ]};
+  b.questions={name:"Questions",buttons:[
+    W("what","❔","question"),W("where","📍","question"),W("who","🧑","question"),W("when","⏰","question"),W("why","🤔","question"),W("how","🛠️","question"),
+    W("which","☝️","question"),W("can","💪","verb"),W("is","🟰","verb"),W("do","✔️","verb"),
+    Q("What is that?","🔎"),Q("Where are we going?","🗺️"),Q("Can I have a turn?","🔄"),Q("What's next?","⏭️"),Q("How are you?","🙂"),Q("Can you help me?","🙏")
+  ]};
+  b.actions={name:"Actions",buttons:[
+    W("go","🚶","verb"),W("come","👋","verb"),W("look","👀","verb"),W("listen","👂","verb"),W("make","🔨","verb"),W("give","🎁","verb"),
+    W("get","🫴","verb"),W("put","📥","verb"),W("open","📂","verb"),W("close","📁","verb"),W("turn","🔁","verb"),W("wait","⏳","verb"),
+    W("read","📖","verb"),W("write","✍️","verb"),W("draw","🖍️","verb"),W("sing","🎤","verb"),W("dance","💃","verb"),W("sleep","😴","verb"),
+    W("wash","🧼","verb"),W("sit","🪑","verb"),W("walk","🚶‍♂️","verb"),W("run","🏃","verb"),W("watch","📺","verb"),W("know","💡","verb")
+  ]};
+  b.describe={name:"Describe",buttons:[
+    W("big","🐘","describe"),W("little","🐭","describe"),W("good","👍","describe"),W("bad","👎","describe"),W("fast","⚡","describe"),W("slow","🐢","describe"),
+    W("hot","🔥","describe"),W("cold","❄️","describe"),W("loud","📢","describe"),W("quiet","🤫","describe"),W("new","✨","describe"),W("old","🕰️","describe"),
+    W("red","🟥","describe"),W("blue","🟦","describe"),W("green","🟩","describe"),W("yellow","🟨","describe"),W("black","⬛","describe"),W("white","⬜","describe"),
+    W("all","💯","describe"),W("some","🔹","describe"),W("same","🟰","describe"),W("different","🔀","describe"),W("up","⬆️","describe"),W("down","⬇️","describe")
+  ]};
+  b.body={name:"Body",buttons:[
+    W("head","🙆","noun"),W("eyes","👀","noun"),W("ears","👂","noun"),W("nose","👃","noun"),W("mouth","👄","noun"),W("teeth","🦷","noun"),
+    W("arm","💪","noun"),W("hand","✋","noun"),W("tummy","🫃","noun"),W("leg","🦵","noun"),W("foot","🦶","noun"),W("back","🔙","noun"),
+    W("hurts","🤕","verb"),W("itchy","🐜","describe"),W("bathroom","🚽","noun"),W("medicine","💊","noun"),Q("I need the bathroom","🚻"),Q("Something hurts","🩹")
+  ]};
+  b.things={name:"Things",buttons:[
+    W("toy","🧸","noun"),W("ball","⚽","noun"),W("book","📕","noun"),W("tablet","📱","noun"),W("TV","📺","noun"),W("music","🎵","noun"),
+    W("blocks","🧱","noun"),W("puzzle","🧩","noun"),W("crayons","🖍️","noun"),W("bubbles","🫧","noun"),W("blanket","🛌","noun"),W("shoes","👟","noun"),
+    W("coat","🧥","noun"),W("hat","🧢","noun"),W("bag","🎒","noun"),W("dog","🐶","noun"),W("cat","🐱","noun"),W("game","🎲","noun")
+  ]};
+  b.chat={name:"Chat",buttons:[
+    Q("Hello!","👋"),Q("Goodbye!","👋","Goodbye!"),Q("Thank you","🙏"),Q("Please","🥺"),Q("Sorry","😔"),Q("Excuse me","🙋"),
+    Q("My name is…","📛","My name is"),Q("I don't know","🤷"),Q("I need a break","⏸️"),Q("Leave me alone, please","🚪"),Q("I love you","❤️"),Q("That's funny!","😂"),
+    Q("Wait, I'm talking","✋"),Q("Not now","🙅"),Q("All done","🏁"),Q("Again!","🔁"),Q("My turn","🙋‍♂️"),Q("Your turn","👉"),
+    Q("Yes, please","👍"),Q("No, thank you","🙅"),Q("I like it","😍"),Q("I don't like it","😖"),Q("Wow!","🤩"),Q("Uh oh","😬"),
+    Q("Cool!","😎"),Q("That's mine","✋"),Q("I want something else","🔄"),Q("Look at that!","👀"),Q("That's not right","⚠️"),Q("I'm okay","👌")
+  ]};
+  b.numbers={name:"Numbers",buttons:[
+    ...["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"].map((s,i)=>W(String(i),s,"describe")),
+    W("first","🥇","describe"),W("last","🔚","describe"),W("today","📅","noun"),W("tomorrow","➡️","noun"),W("yesterday","⬅️","noun"),
+    W("now","⏱️","describe"),W("later","⌛","describe"),W("time","🕒","noun")
+  ]};
+  return b;
+}
+
+/* Layout templates: buttons per page -> [columns, rows] */
+const TEMPLATES={1:[1,1],2:[2,1],3:[3,1],4:[2,2],5:[5,1],6:[3,2],8:[4,2],9:[3,3],12:[4,3],15:[5,3],16:[4,4],20:[5,4],24:[6,4],28:[7,4],32:[8,4],36:[6,6],40:[8,5],48:[8,6],60:[10,6]};
+const TPL_KEYS=Object.keys(TEMPLATES).map(Number);
+function tplDims(n){
+  if(TEMPLATES[n]) return TEMPLATES[n];
+  const landscape=innerWidth>=innerHeight;
+  let c=Math.ceil(Math.sqrt(n*(landscape?1.5:0.75))); c=Math.max(1,Math.min(n,c));
+  return [c,Math.ceil(n/c)];
+}
+/* In portrait screens, flip wide templates (e.g. 2 across becomes 2 stacked) */
+function orientDims(n){
+  return TEMPLATES[n]||tplDims(n); // same grid in portrait and landscape, so learned positions never move
+}
+const tplName=n=>n==1?"1 button":n+" buttons";
+
+const DEFAULT_SETTINGS={volume:1,calm:false,highlight:false,vibrate:false,inputStyle:"symbols",voicePerLang:{},lang:"",accent:"",layout:"all",gap:8,symScale:1,protect:false,voice:"",rate:0.95,pitch:1,speakEach:true,clearAfter:false,cols:6,theme:"light",labels:"bottom",
+  homeAfter:false,hold:0,deb:0,scan:false,scanMs:1500,lock:false,code:""};
+
+const firstRun=!store.get(KEY);
+let state=store.get(KEY);
+if(!state||!state.boards||!state.boards.home){state={boards:starter(),settings:{...DEFAULT_SETTINGS},history:[]};}
+state.settings={...DEFAULT_SETTINGS,...state.settings};
+state.history=state.history||[];
+let warnedFull=false;
+const save=()=>{ if(!store.set(KEY,state) && !warnedFull){warnedFull=true;toast("Device storage is full or blocked: copy a backup in Settings");} };
+
+/* ====================== Emoji library for the picker ====================== */
+const EMOJI_LIB=`🙋 I me|👉 you point|👦 boy he|👧 girl she|👩 mom woman|👨 dad man|👵 grandma|👴 grandpa|👶 baby|🧑‍🏫 teacher|🧑‍⚕️ doctor nurse|🤝 friend|👥 they people|👫 we|
+😊 happy smile|😢 sad cry|😠 angry mad|😨 scared afraid|😴 tired sleep|🤩 excited|🤒 sick|🤕 hurt|😑 bored|😌 calm|😟 worried|🤪 silly|😤 frustrated|😂 funny laugh|❤️ love heart|🥺 please|😔 sorry|🤷 dont know|
+🍎 apple|🍌 banana|🍇 grapes|🍓 strawberry|🍊 orange|🍉 watermelon|🍞 bread|🥪 sandwich|🍕 pizza|🍔 burger|🌭 hotdog|🍟 fries|🍗 chicken|🍚 rice|🍝 pasta spaghetti|🥚 egg|🥣 cereal|🧀 cheese|🍪 cookie|🍰 cake|🍦 ice cream|🥕 carrot|🥦 broccoli|🌽 corn|🍲 soup|🍿 popcorn snack|🥞 pancakes|🌮 taco|🍫 chocolate|🍬 candy|
+💧 water|🥛 milk|🧃 juice|🍵 tea|☕ coffee hot|🥤 cup drink soda|🍼 bottle|🧊 ice cold|
+🏠 home house|🏫 school|🚻 bathroom toilet|🚽 toilet potty|🛏️ bed bedroom|🍳 kitchen cook|🌳 outside tree|🛝 park slide|🏪 store shop|🚗 car|🚌 bus|🚲 bike|✈️ plane|🏥 hospital|⛪ church|🕌 mosque|📚 library books|🏊 pool swim|🍴 restaurant|🏖️ beach|
+❓ question what|📍 where|⏰ when time|🤔 why think|🛠️ how fix|
+🚶 go walk|🏃 run|👋 hello bye wave|👀 look see|👂 listen hear|🔨 make build|🎁 give gift|📂 open|📁 close|⏳ wait|📖 read|✍️ write|🖍️ draw color|🎤 sing|💃 dance|🧼 wash|🪑 sit chair|📺 watch tv|💡 idea know|🍽️ eat|🤲 want|👍 like good yes|👎 bad|✋ stop hand|🆘 help|🧸 toy play|💭 feel think|🛁 bath|🪥 brush teeth|
+➕ more|🏁 finished done|✅ yes|❌ no|🚫 not|🔁 again|⏸️ break pause|
+🐘 big|🐭 little small|⚡ fast|🐢 slow|🔥 hot|❄️ cold|📢 loud|🤫 quiet|✨ new|🟥 red|🟦 blue|🟩 green|🟨 yellow|🟧 orange|🟪 purple|⬛ black|⬜ white|⬆️ up|⬇️ down|⬅️ left|➡️ right|
+⚽ ball|📕 book|📱 tablet phone|🎵 music|🧱 blocks|🧩 puzzle|🫧 bubbles|🎈 balloon|👟 shoes|🧥 coat|🧢 hat|🎒 bag backpack|🐶 dog|🐱 cat|🐟 fish|🐦 bird|🐴 horse|🎲 game|🎮 video game|🖥️ computer|💊 medicine|🩹 bandage|
+☀️ sun day|🌙 night moon|🌧️ rain|⛄ snow|📅 today calendar|🎂 birthday|🎄 holiday|⭐ star|🔢 numbers|🧑‍🤝‍🧑 family|👨‍👩‍👧 family people|💬 chat talk|🎨 art describe`.split("|").map(x=>x.trim()).filter(Boolean)
+ .map(x=>{const i=x.indexOf(" ");return{e:x.slice(0,i),k:x.slice(i+1)}});
+
+const CATS=[["pronoun","People / pronouns"],["verb","Actions"],["describe","Describing"],["noun","Things / nouns"],
+  ["social","Social"],["question","Questions"],["negate","No / not"],["misc","Other"],["folder","Folder"]];
+
+/* ====================== Elements & helpers ====================== */
+const $=id=>document.getElementById(id);
+const grid=$("grid"), msgEl=$("msg");
+let message=[];          // [{label,sym,speak,letters}]
+let path=["home"];       // board navigation stack
+let view="board";        // board | kbd
+let editing=false;
+function toast(t){const e=$("toast");e.textContent=t;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",1800);}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ====================== Speech ====================== */
+let voices=[];
+const normLang=l=>{const p=String(l||"").replace(/_/g,"-").split("-");return p[0].toLowerCase()+(p[1]?"-"+p[1].toUpperCase():"");};
+const baseLang=l=>normLang(l).split("-")[0];
+let DNl=null,DNr=null; try{DNl=new Intl.DisplayNames([navigator.language||"en"],{type:"language"});DNr=new Intl.DisplayNames([navigator.language||"en"],{type:"region"});}catch(e){}
+const langName=c=>{try{return DNl?DNl.of(c):c}catch(e){return c}};
+const accentName=c=>{const r=normLang(c).split("-")[1]; if(!r) return langName(c)+" (general)"; try{return (DNr?DNr.of(r):r)+" — "+c}catch(e){return c}};
+const devLang=()=>baseLang(navigator.language||"en");
+const curLang=()=>state.settings.lang||devLang();
+function voicesFor(){
+  const S=state.settings, L=curLang();
+  return voices.filter(v=>baseLang(v.lang)===L && (!S.accent||normLang(v.lang)===S.accent));
+}
+function loadVoices(){
+  if(!("speechSynthesis" in window))return;
+  voices=speechSynthesis.getVoices().slice().sort((a,b)=>(b.localService-a.localService)||a.name.localeCompare(b.name));
+  fillLangs();
+}
+function fillLangs(){
+  const S=state.settings;
+  const langs=[...new Set(voices.map(v=>baseLang(v.lang)))].sort((a,b)=>langName(a).localeCompare(langName(b)));
+  $("sLang").innerHTML=`<option value="">Device language (${esc(langName(devLang()))})</option>`+langs.map(l=>`<option value="${l}">${esc(langName(l))}</option>`).join("");
+  $("sLang").value=langs.includes(S.lang)?S.lang:"";
+  fillAccents();
+}
+function fillAccents(){
+  const S=state.settings, L=curLang();
+  const acc=[...new Set(voices.filter(v=>baseLang(v.lang)===L).map(v=>normLang(v.lang)))].sort((a,b)=>accentName(a).localeCompare(accentName(b)));
+  $("sAccent").innerHTML='<option value="">Any accent</option>'+acc.map(a=>`<option value="${a}">${esc(accentName(a))}</option>`).join("");
+  $("sAccent").value=acc.includes(S.accent)?S.accent:"";
+  fillVoices();
+}
+function fillVoices(){
+  const S=state.settings, list=voicesFor();
+  $("sVoice").innerHTML='<option value="">Best match for this language</option>'+list.map(v=>`<option value="${esc(v.voiceURI)}">${v.localService?"✈️ ":"🌐 "}${esc(v.name)} (${esc(normLang(v.lang))})</option>`).join("");
+  $("sVoice").value=list.some(v=>v.voiceURI===S.voice)?S.voice:"";
+  $("sVoiceHint").textContent=voices.length?(list.length?"✈️ = works offline · 🌐 = needs internet. Only languages and accents installed on this device are listed.":"No voice for this choice on this device yet; it will use the closest one."):"This device hasn't shared its voices yet. Tap Test, or add voices (see below).";
+}
+function pickVoice(){
+  const S=state.settings;
+  const chosen=voices.find(v=>v.voiceURI===S.voice)||voices.find(v=>v.voiceURI===(S.voicePerLang||{})[curLang()]); if(chosen) return chosen;
+  const L=curLang();
+  return voices.find(v=>S.accent&&normLang(v.lang)===S.accent&&v.localService)||voices.find(v=>S.accent&&normLang(v.lang)===S.accent)
+      ||voices.find(v=>baseLang(v.lang)===L&&v.default)||voices.find(v=>baseLang(v.lang)===L&&v.localService)||voices.find(v=>baseLang(v.lang)===L)||null;
+}
+$("sLang").addEventListener("change",()=>{const S=state.settings;S.lang=$("sLang").value;S.accent="";S.voice="";fillAccents();save();});
+$("sAccent").addEventListener("change",()=>{const S=state.settings;S.accent=$("sAccent").value;S.voice="";fillVoices();save();});
+const TEST_PHRASE={en:"Hello, this is my voice.",es:"Hola, esta es mi voz.",fr:"Bonjour, voici ma voix.",pt:"Olá, esta é a minha voz.",de:"Hallo, das ist meine Stimme.",it:"Ciao, questa è la mia voce.",yo:"Ẹ n lẹ, ohùn mi nìyí.",ig:"Ndewo, nke a bụ olu m.",ha:"Sannu, wannan ita ce murya ta.",sw:"Habari, hii ni sauti yangu.",ar:"مرحبا، هذا صوتي.",zh:"你好，这是我的声音。",hi:"नमस्ते, यह मेरी आवाज़ है।",ja:"こんにちは、これは私の声です。",ko:"안녕하세요, 제 목소리입니다.",ru:"Привет, это мой голос.",nl:"Hallo, dit is mijn stem.",pl:"Cześć, to jest mój głos.",tr:"Merhaba, bu benim sesim.",vi:"Xin chào, đây là giọng của tôi."};
+$("sTest").onclick=()=>{ loadVoices(); say(TEST_PHRASE[curLang()]||TEST_PHRASE.en); };
+if("speechSynthesis" in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices;}
+let curUtter=null; // keep a reference: Safari and Chrome can drop utterances that get garbage-collected
+function say(text){
+  if(!text)return;
+  if(!("speechSynthesis" in window)){toast("Speech is not available on this device");return;}
+  try{
+    if(!voices.length) loadVoices();
+    const go=()=>{
+      const u=new SpeechSynthesisUtterance(text);
+      const v=pickVoice(); if(v){u.voice=v;u.lang=v.lang;} else u.lang=state.settings.accent||state.settings.lang||navigator.language||"en-US";
+      u.rate=state.settings.rate; u.pitch=state.settings.pitch; u.volume=state.settings.volume??1;
+      curUtter=u; u.onend=u.onerror=()=>{if(curUtter===u)curUtter=null;};
+      speechSynthesis.resume(); // Chrome on some devices pauses the speech queue
+      speechSynthesis.speak(u);
+    };
+    if(speechSynthesis.speaking||speechSynthesis.pending){ speechSynthesis.cancel(); setTimeout(go,60); } // Safari drops a speak() that follows cancel() at once
+    else go();
+  }catch(e){toast("Speech could not start");}
+}
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ try{speechSynthesis.cancel()}catch(e){} } });
+function messageText(){
+  let out="";
+  message.forEach((w,i)=>{
+    const t=w.speak||w.label;
+    if(w.letters){ // typed text: join with previous typed text without extra space handling
+      out+= (out && !out.endsWith(" ") && i>0 && !message[i-1].letters ? " " : "") + t;
+    } else out+=(out && !out.endsWith(" ")?" ":"")+t;
+  });
+  return out.replace(/\s+/g," ").trim();
+}
+function speakMessage(){
+  const t=messageText(); if(!t)return;
+  say(t);
+  msgEl.querySelectorAll(".chip").forEach(c=>c.classList.add("speaking"));
+  setTimeout(()=>msgEl.querySelectorAll(".chip").forEach(c=>c.classList.remove("speaking")),900);
+  state.history=[t,...state.history.filter(h=>h!==t)].slice(0,40); save();
+  if(state.settings.clearAfter){message=[];renderMsg();}
+}
+
+/* ====================== Message bar ====================== */
+function renderMsg(){
+  msgEl.innerHTML=message.map(w=>`<div class="chip ${w.letters?"letters":""} ${w.cat?"cat-"+w.cat:""}">${w.img?`<img src="${w.img}" alt="">`:w.sym?`<span class="s">${w.sym}</span>`:""}<span class="t">${esc(w.label)}</span></div>`).join("");
+  msgEl.scrollLeft=msgEl.scrollWidth;
+}
+function addWord(b){message.push({label:b.label,sym:b.sym,img:b.img,speak:b.speak,cat:b.cat});renderMsg();}
+
+/* ====================== Boards ====================== */
+const curId=()=>state.boards[path[path.length-1]]?path[path.length-1]:"home";
+const curBoard=()=>state.boards[curId()];
+const pageOf={}; let pageCount=1;
+const boardLayout=bd=>{const v=bd.layout||state.settings.layout;return v&&v!=="all"?+v:0;};
+function cellHTML(it,i){
+  const ix=` data-idx="${it.idx}"`;
+  return cellInner(it).replace(/^<(button|div) class=/,m=>m.slice(0,-6)+ix+" class=");
+}
+function cellInner(it){
+  if(it.add) return `<button class="cell empty" data-add="1"><span class="s">➕</span><span class="t">Add button</span></button>`;
+  if(it.pad) return editing?`<button class="cell empty pad" data-add="1"><span class="s">➕</span><span class="t">Add</span></button>`:`<div class="cell pad" aria-hidden="true"></div>`;
+  const b=it.b;
+  if(b.type==="blank") return `<button class="cell blank-slot" data-id="${b.id}" aria-hidden="${!editing}"><span class="s">${editing?"＋":""}</span><span class="t">${editing?"Empty space":""}</span></button>`;
+  if(b.hidden && !editing) return `<div class="cell pad" aria-hidden="true"></div>`; // keep its place so positions never move
+  const cls=b.type==="folder"?"folder":"cat-"+(b.cat||"misc");
+  return `<button class="cell ${cls} ${b.hidden?"hidden-btn":""}" data-id="${b.id}" aria-label="${esc(b.label)}${b.type==="folder"?" folder":""}">${b.img?`<img class="ph" src="${b.img}" alt="">`:`<span class="s">${b.sym||""}</span>`}<span class="t">${esc(b.label)}</span><span class="hold"></span></button>`;
+}
+function renderBoard(){
+  const S=state.settings, bd=curBoard(), id=curId();
+  $("crumb").textContent=innerWidth<640?bd.name:path.map(p=>(state.boards[p]||{}).name||p).join(" › ");
+  const N=boardLayout(bd);
+  let items=bd.buttons.map((b,i)=>({b,idx:i}));
+  let slice;
+  if(N){
+    if(editing && items.length%N===0 && !bd.buttons.some(b=>b.type==="blank")) items.push({add:true,idx:items.length});
+    pageCount=Math.max(1,Math.ceil(items.length/N));
+    pageOf[id]=Math.min(pageOf[id]||0,pageCount-1);
+    slice=items.slice(pageOf[id]*N,(pageOf[id]+1)*N);
+    { let k=pageOf[id]*N+slice.length; while(slice.length<N) slice.push({pad:true,idx:k++}); }
+    const [c,r]=orientDims(N);
+    grid.style.gridTemplateColumns=`repeat(${c},1fr)`;
+    grid.style.gridTemplateRows=`repeat(${r},1fr)`;
+    grid.style.gridAutoRows="";
+  }else{
+    if(editing) items.push({add:true,idx:items.length});
+    pageCount=1; pageOf[id]=0; slice=items;
+    grid.style.gridTemplateColumns=`repeat(${S.cols},1fr)`;
+    grid.style.gridTemplateRows=""; grid.style.gridAutoRows="1fr";
+  }
+  grid.innerHTML=slice.map(cellHTML).join("");
+  const paged=view==="board"&&pageCount>1;
+  document.body.classList.toggle("paged",paged);
+  const pg=pageOf[id]||0;
+  $("pPrev").disabled=pg===0; $("pNext").disabled=pg>=pageCount-1;
+  $("pPrevL").textContent=$("pNextL").textContent=paged?`${pg+1} / ${pageCount}`:"";
+  $("nBackBoard").style.display=path.length>1?"flex":"none";
+  requestAnimationFrame(sizeCells);
+}
+/* Scale symbols and labels to the actual button size, so a 2-button page gets huge symbols */
+function sizeCells(){
+  const c=grid.querySelector(".cell"); if(!c){return;}
+  const r=c.getBoundingClientRect(); const m=Math.min(r.width,r.height);
+  if(!m) return;
+  const hasLbl=state.settings.labels!=="none";
+  const k=state.settings.symScale||1;
+  grid.style.setProperty("--sym",Math.max(18,Math.min(m*(hasLbl?0.5:0.68)*k,m*0.85,300))+"px");
+  grid.style.setProperty("--lbl",Math.max(12,Math.min(m*0.13,r.width*0.11,56))+"px");
+}
+addEventListener("resize",()=>{if(view==="board")renderBoard();});
+function turnPage(d){
+  const id=curId(); const p=(pageOf[id]||0)+d;
+  if(p<0||p>=pageCount) return;
+  pageOf[id]=p; renderBoard();
+}
+$("pPrev").onclick=()=>turnPage(-1);
+$("pNext").onclick=()=>turnPage(1);
+/* swipe left/right to change page */
+let swX=null;
+grid.addEventListener("touchstart",e=>{swX=e.touches[0].clientX;},{passive:true});
+grid.addEventListener("touchend",e=>{
+  if(swX==null||pageCount<2||state.settings.scan||editing)return;
+  const dx=e.changedTouches[0].clientX-swX; swX=null;
+  if(Math.abs(dx)>80){ turnPage(dx<0?1:-1); lastHit=Date.now(); swipeBlock=Date.now(); }
+});
+let swipeBlock=0;
+
+/* ---- Drag and drop to rearrange (Edit mode; mouse, touch and pen) ---- */
+let drag=null, dragEnded=0;
+grid.addEventListener("pointerdown",e=>{
+  if(!editing||e.button>0) return;
+  const el=e.target.closest(".cell[data-id]"); if(!el) return;
+  drag={idx:+el.dataset.idx,el,x:e.clientX,y:e.clientY,started:false,over:null,flip:null};
+});
+function dropTargetAt(x,y){
+  const t=document.elementFromPoint(x,y); if(!t) return null;
+  return t.closest("#grid .cell[data-idx], .pager:not(:disabled)");
+}
+document.addEventListener("pointermove",e=>{
+  if(!drag) return;
+  if(!drag.started){
+    if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<10) return;
+    drag.started=true;
+    const r=drag.el.getBoundingClientRect();
+    const g=drag.el.cloneNode(true); g.id="ghost"; g.classList.remove("drop-hi");
+    g.style.width=r.width+"px"; g.style.height=r.height+"px";
+    drag.dx=e.clientX-r.left; drag.dy=e.clientY-r.top; drag.ghost=g;
+    document.body.appendChild(g); drag.el.classList.add("dragging");
+  }
+  e.preventDefault();
+  drag.ghost.style.left=(e.clientX-drag.dx)+"px"; drag.ghost.style.top=(e.clientY-drag.dy)+"px";
+  const t=dropTargetAt(e.clientX,e.clientY);
+  if(t!==drag.over){
+    if(drag.over) drag.over.classList.remove("drop-hi");
+    clearTimeout(drag.flip); drag.flip=null;
+    drag.over=t;
+    if(t){
+      t.classList.add("drop-hi");
+      if(t.classList.contains("pager")){ // hold over an arrow to carry the button to the next/previous page
+        drag.flip=setTimeout(()=>{ if(!drag) return; turnPage(t.id==="pNext"?1:-1); drag.over=null; t.classList.remove("drop-hi");
+          const src=grid.querySelector(`.cell[data-idx="${drag.idx}"]`); if(src) src.classList.add("dragging"); },650);
+      }
+    }
+  }
+},{passive:false});
+function endDrag(cancel){
+  if(!drag) return;
+  const d=drag; drag=null; clearTimeout(d.flip);
+  if(!d.started) return;
+  dragEnded=Date.now();
+  d.ghost.remove(); if(d.over) d.over.classList.remove("drop-hi");
+  if(!cancel && d.over && d.over.dataset && d.over.dataset.idx!=null){
+    const to=+d.over.dataset.idx, from=d.idx;
+    if(to!==from){
+      const bt=curBoard().buttons;
+      while(bt.length<=to) bt.push({id:nid(),type:"blank",label:""}); // dropping on an empty spot keeps every other button where it is
+      [bt[from],bt[to]]=[bt[to],bt[from]];
+      while(bt.length && bt[bt.length-1].type==="blank" && boardLayout(curBoard())===0) bt.pop();
+      save(); toast("Moved");
+    }
+  }
+  renderBoard();
+}
+document.addEventListener("pointerup",()=>endDrag(false));
+document.addEventListener("pointercancel",()=>endDrag(true));
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") endDrag(true); });
+function activate(b){
+  if(editing){openEditor(b);return;}
+  if(b.type==="folder"){
+    if(!state.boards[b.target]){toast("That folder is empty");return;}
+    path.push(b.target); pageOf[b.target]=0; renderBoard(); if(state.settings.speakEach) say(b.label); return;
+  }
+  if(b.type==="speak"){ say(b.speak||b.label); return; }
+  addWord(b); if(state.settings.speakEach) say(b.speak||b.label);
+  if(state.settings.homeAfter && path.length>1){path=["home"];renderBoard();}
+}
+
+/* ---- Pointer handling: hold-to-select + debounce ---- */
+let lastHit=0, holdTimer=null, holdEl=null;
+function findBtn(id){return curBoard().buttons.find(b=>b.id===id);}
+function fireCell(el){
+  if(state.settings.vibrate && !editing){ try{navigator.vibrate&&navigator.vibrate(15)}catch(e){} }
+  if(el.dataset.add){addButton();return;}
+  const b=findBtn(el.dataset.id); if(!b) return;
+  if(b.type==="blank" && !editing) return;
+  activate(b);
+}
+grid.addEventListener("pointerdown",e=>{
+  const el=e.target.closest(".cell"); if(!el||state.settings.scan)return;
+  const hold=editing?0:state.settings.hold;
+  if(hold>0){
+    holdEl=el; const bar=el.querySelector(".hold");
+    if(bar){bar.style.transition="none";bar.style.width="0";requestAnimationFrame(()=>{bar.style.transition=`width ${hold}ms linear`;bar.style.width="100%";});}
+    holdTimer=setTimeout(()=>{holdTimer=null;resetHold();tryFire(el);},hold);
+  }
+});
+function resetHold(){if(holdEl){const bar=holdEl.querySelector(".hold");if(bar){bar.style.transition="none";bar.style.width="0";}}holdEl=null;}
+["pointerup","pointerleave","pointercancel"].forEach(ev=>grid.addEventListener(ev,()=>{if(holdTimer){clearTimeout(holdTimer);holdTimer=null;resetHold();}}));
+grid.addEventListener("click",e=>{
+  const el=e.target.closest(".cell"); if(!el||state.settings.scan)return;
+  if(Date.now()-dragEnded<350) return; // that was a drag, not a tap
+  if(!editing && state.settings.hold>0) return; // handled by hold timer
+  tryFire(el);
+});
+function tryFire(el){
+  const now=Date.now(); if(now-swipeBlock<450)return; if(!editing && now-lastHit<state.settings.deb)return; lastHit=now; fireCell(el);
+}
+
+/* ====================== Keyboard view ====================== */
+const COMMON=("i you want go like not it help more stop yes no me eat drink play feel the a and to is can do have get my what where who when why how this that please thank thanks hello hi bye good bad happy sad tired hungry thirsty bathroom water mom dad home school now later today tomorrow need am are was will with for in on out up down all done again turn look see come make know love okay sorry wait friend teacher"
+  ).split(" ");
+let typed="";
+function buildKeys(){
+  const rows="QWERTYUIOPASDFGHJKL'ZXCVBNM,.?".split("");
+  let h=rows.map(k=>`<button data-k="${esc(k)}">${esc(k)}</button>`).join("");
+  h+=`<button class="wide" data-k="BKSP">⌫</button><button class="space" data-k=" ">space</button><button class="wide" data-k="ADD">Add ↑</button><button class="wide" data-k="SAY">🔊 Say</button>`;
+  $("keys").innerHTML=h;
+}
+function predictions(){
+  const last=typed.split(" ").pop().toLowerCase();
+  const all=[...new Set([...COMMON,...Object.values(state.boards).flatMap(b=>b.buttons.filter(x=>x.type==="word").map(x=>x.label.toLowerCase()))])];
+  let p=last?all.filter(w=>w.startsWith(last)&&w!==last):COMMON;
+  return p.slice(0,5);
+}
+function renderKbd(){
+  $("pred").innerHTML=`<button data-p="__typed" style="flex:2;text-align:left;padding:0 14px;font-size:1.3rem">${esc(typed)||'<span style="color:var(--muted)">Type here…</span>'}</button>`+
+    predictions().map(w=>`<button data-p="${esc(w)}">${esc(w)}</button>`).join("");
+}
+function commitTyped(){
+  const t=typed.trim(); if(!t)return;
+  t.split(/\s+/).forEach(w=>message.push({label:w,letters:true}));
+  typed=""; renderMsg(); renderKbd();
+}
+$("keys").addEventListener("click",e=>{
+  const k=e.target.closest("button")?.dataset.k; if(k==null)return;
+  if(k==="BKSP") typed=typed.slice(0,-1);
+  else if(k==="ADD") {commitTyped();return;}
+  else if(k==="SAY") {commitTyped();speakMessage();return;}
+  else if(k===" "){ if(typed.trim()){commitTyped();return;} }
+  else typed+= (typed===""||typed.endsWith(" "))?k:k.toLowerCase();
+  renderKbd();
+});
+$("pred").addEventListener("click",e=>{
+  const p=e.target.closest("button")?.dataset.p; if(!p)return;
+  if(p==="__typed"){ if(typed.trim()) say(typed); return; }
+  const parts=typed.split(" "); parts[parts.length-1]=p; typed=parts.join(" "); commitTyped();
+  if(state.settings.speakEach) say(p);
+});
+function setView(v){
+  view=v; grid.style.display=v==="board"?"grid":"none"; $("kbd").style.display=v==="kbd"?"flex":"none";
+  $("nKbd").classList.toggle("on",v==="kbd");
+  if(v==="kbd"){document.body.classList.remove("paged");renderKbd();$("crumb").textContent="Keyboard";} else renderBoard();
+  if(scanTimer) startScan();
+}
+
+document.addEventListener("keydown",e=>{
+  if(view!=="kbd"||document.querySelector(".overlay.show")||(state.settings.scan&&scanTimer)||e.ctrlKey||e.metaKey||e.altKey) return;
+  if(/^[a-zA-Z',.?!]$/.test(e.key)){ typed+=(typed===""||typed.endsWith(" "))?e.key.toUpperCase():e.key.toLowerCase(); renderKbd(); e.preventDefault(); }
+  else if(e.key==="Backspace"){ typed=typed.slice(0,-1); renderKbd(); e.preventDefault(); }
+  else if(e.key===" "){ if(typed.trim()) commitTyped(); e.preventDefault(); }
+  else if(e.key==="Enter"){ commitTyped(); speakMessage(); e.preventDefault(); }
+});
+/* ====================== Top bar actions ====================== */
+$("bSpeak").onclick=speakMessage;
+msgEl.onclick=speakMessage;
+$("bBack").onclick=()=>{ if(view==="kbd"&&typed){typed=typed.slice(0,-1);renderKbd();return;} message.pop();renderMsg(); };
+$("bClear").onclick=()=>{message=[];typed="";renderMsg();if(view==="kbd")renderKbd();try{speechSynthesis.cancel()}catch(e){}};
+$("nHome").onclick=()=>{path=["home"];setView("board");};
+$("nBackBoard").onclick=()=>{if(path.length>1)path.pop();setView("board");};
+$("nKbd").onclick=()=>setView(view==="kbd"?"board":"kbd");
+$("nHist").onclick=()=>{renderHist();show("oHist");};
+function toggleEdit(){editing=!editing;document.body.classList.toggle("editing",editing);$("nEdit").classList.toggle("on",editing);
+  if(editing&&state.settings.scan){stopScan();} else if(!editing&&state.settings.scan) startScan();
+  setView("board"); toast(editing?"Edit mode: tap any button to change it":"Edit mode off");}
+$("nEdit").onclick=()=>{ if(editing) toggleEdit(); else guard(toggleEdit); };
+let gearT=null;
+$("nSet").onclick=()=>{ if(state.settings.protect && !editing){ toast("Press and hold ⚙️ for 2 seconds"); return; } guard(openSettings); };
+$("nSet").addEventListener("pointerdown",()=>{ if(!state.settings.protect||editing)return; gearT=setTimeout(()=>{gearT=null;guard(openSettings);},2000); });
+["pointerup","pointerleave","pointercancel"].forEach(ev=>$("nSet").addEventListener(ev,()=>{clearTimeout(gearT);gearT=null;}));
+$("nSet").addEventListener("contextmenu",e=>e.preventDefault());
+grid.addEventListener("contextmenu",e=>e.preventDefault());
+
+function show(id){$(id).classList.add("show");stopScanTemp();}
+function hide(id){$(id).classList.remove("show");resumeScan();}
+
+/* ---- in-page prompt (alerts/prompts are not used) ---- */
+function ask(title,text,{input=false,value="",okText="OK"}={}){
+  return new Promise(res=>{
+    $("aTitle").textContent=title;$("aText").textContent=text||"";
+    $("aInRow").style.display=input?"flex":"none";$("aIn").value=value;$("aYes").textContent=okText;
+    show("oAsk"); if(input) setTimeout(()=>$("aIn").focus(),50);
+    const done=v=>{hide("oAsk");$("aYes").onclick=$("aNo").onclick=null;res(v);};
+    $("aYes").onclick=()=>done(input?$("aIn").value:true);
+    $("aNo").onclick=()=>done(null);
+  });
+}
+async function guard(fn){
+  if(state.settings.lock && state.settings.code && !editing){
+    const v=await ask("Enter code","Edit and settings are locked.",{input:true});
+    if(v!==state.settings.code){ if(v!==null) toast("Wrong code"); return; }
+  }
+  fn();
+}
+
+/* ====================== History ====================== */
+function renderHist(){
+  $("hList").innerHTML=state.history.length?state.history.map((h,i)=>`<div class="row"><button class="b" data-h="${i}" style="flex:1;text-align:left">🔊 ${esc(h)}</button><button class="b" data-hu="${i}">Use</button></div>`).join(""):'<p class="hint">Nothing spoken yet.</p>';
+}
+$("hList").onclick=e=>{
+  const s=e.target.closest("[data-h]"), u=e.target.closest("[data-hu]");
+  if(s) say(state.history[s.dataset.h]);
+  if(u){ message=state.history[u.dataset.hu].split(" ").map(w=>({label:w,letters:true})); renderMsg(); hide("oHist"); }
+};
+$("hClose").onclick=()=>hide("oHist");
+$("hClear").onclick=()=>{state.history=[];save();renderHist();};
+
+/* ====================== Button editor ====================== */
+let editRef=null, editCat="misc";
+function fillTargets(sel){
+  $("eTarget").innerHTML=Object.entries(state.boards).filter(([k])=>k!=="home").map(([k,b])=>`<option value="${k}">${esc(b.name)}</option>`).join("")+'<option value="__new">+ New folder…</option>';
+  if(sel) $("eTarget").value=sel;
+}
+function renderSw(){
+  $("eSw").innerHTML=CATS.map(([c,n])=>`<button class="sw ${c===editCat?"on":""}" data-c="${c}" style="background:var(--c-${c})" title="${n}">${n.split(" ")[0]}</button>`).join("");
+}
+$("eSw").onclick=e=>{const c=e.target.closest("[data-c]");if(c){editCat=c.dataset.c;renderSw();}};
+function renderEmojis(){
+  const q=$("eSymFind").value.trim().toLowerCase();
+  const list=q?EMOJI_LIB.filter(x=>x.k.includes(q)):EMOJI_LIB;
+  $("eEmojis").innerHTML=list.map(x=>`<button data-e="${x.e}" title="${esc(x.k)}">${x.e}</button>`).join("")||'<span class="hint">No match — you can also type or paste any emoji in the Symbol box.</span>';
+}
+$("eSymFind").oninput=renderEmojis;
+$("eEmojis").onclick=e=>{const b=e.target.closest("[data-e]");if(b)$("eSym").value=b.dataset.e;};
+$("eType").onchange=()=>{
+  const f=$("eType").value==="folder";
+  $("eTargetRow").style.display=f?"flex":"none";
+  const nw=f&&$("eTarget").value==="__new";
+  $("eTplRow").style.display=nw?"flex":"none"; $("eTplHint").style.display=nw?"block":"none";
+};
+$("eTarget").onchange=()=>$("eType").onchange();
+$("eTpl").innerHTML='<option value="all">Show all (no fixed spaces)</option>'+TPL_KEYS.map(n=>`<option value="${n}">${tplName(n)} per page</option>`).join("");
+$("eTpl").value="4";
+function openEditor(b,isNew){
+  editRef={b,isNew}; editImg=b.img||""; showPhoto();
+  $("eTitle").textContent=isNew?"Add button":"Edit button";
+  $("eLabel").value=b.label||"";$("eSpeak").value=b.speak&&b.speak!==b.label?b.speak:"";$("eSym").value=b.sym||"";
+  $("eSymFind").value="";renderEmojis();
+  editCat=b.cat||"misc";renderSw();
+  $("eType").value=(b.type&&b.type!=="blank")?b.type:"word";fillTargets(b.target);$("eType").onchange();
+  $("eHidden").checked=!!b.hidden;
+  $("eMove").innerHTML='<option value="">Keep on this board</option>'+Object.entries(state.boards).filter(([k])=>k!==curId()).map(([k,x])=>`<option value="${k}">${esc(x.name)}</option>`).join("");
+  $("eMove").parentElement.style.display=isNew?"none":"flex";
+  $("eDel").style.display=isNew?"none":"inline-block";
+  show("oEdit"); setTimeout(()=>$("eLabel").focus(),50);
+}
+let editImg="";
+function showPhoto(){const im=$("ePhotoPrev");im.src=editImg||"";im.style.display=editImg?"inline":"none";$("ePhotoDel").style.display=editImg?"inline-block":"none";$("ePhoto").value="";}
+$("ePhotoDel").onclick=()=>{editImg="";showPhoto();};
+$("ePhoto").onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const url=URL.createObjectURL(f), im=new Image();
+  im.onload=()=>{
+    const max=320, sc=Math.min(1,max/Math.max(im.width,im.height));
+    const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc);
+    const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
+    editImg=c.toDataURL("image/jpeg",0.82); URL.revokeObjectURL(url); showPhoto();
+  };
+  im.onerror=()=>toast("That picture could not be opened");
+  im.src=url;
+};
+function addButton(){openEditor({id:nid(),type:"word",label:"",sym:"",cat:"misc"},true);}
+$("eCancel").onclick=()=>hide("oEdit");
+$("eDel").onclick=async()=>{
+  const ok=await ask("Delete button?",`"${editRef.b.label}" will be removed from this board.`,{okText:"Delete"});
+  if(!ok){show("oEdit");return;}
+  const bd=curBoard(); bd.buttons=bd.buttons.filter(x=>x.id!==editRef.b.id); save(); renderBoard();
+};
+$("eSave").onclick=async()=>{
+  const b=editRef.b, label=$("eLabel").value.trim();
+  if(!label){toast("Please add a label");return;}
+  b.label=label; b.speak=$("eSpeak").value.trim(); b.sym=$("eSym").value.trim(); if(editImg) b.img=editImg; else delete b.img; b.type=$("eType").value; b.hidden=$("eHidden").checked;
+  b.cat=b.type==="folder"?"folder":(editCat==="folder"?"misc":editCat);
+  if(b.type==="folder"){
+    let t=$("eTarget").value;
+    if(t==="__new"){
+      t="f"+Date.now().toString(36);
+      const n=$("eTpl").value;
+      state.boards[t]={name:label,buttons:[]};
+      if(n!=="all"){ state.boards[t].layout=+n; for(let i=0;i<+n;i++) state.boards[t].buttons.push({id:nid(),type:"blank",label:""}); }
+    }
+    b.target=t;
+  } else delete b.target;
+  if(b.type==="speak" && !b.speak) b.speak=label;
+  if(editRef.isNew) curBoard().buttons.push(b);
+  const mv=$("eMove").value;
+  if(!editRef.isNew && mv && state.boards[mv]){
+    const here=curBoard(), i=here.buttons.findIndex(x=>x.id===b.id);
+    if(boardLayout(here)) here.buttons[i]={id:nid(),type:"blank",label:""}; else here.buttons.splice(i,1); // fixed layouts keep the gap so nothing shifts
+    const dest=state.boards[mv].buttons, bi=dest.findIndex(x=>x.type==="blank");
+    if(bi>=0) dest[bi]=b; else dest.push(b);
+    toast(`Moved to ${state.boards[mv].name}`);
+  }
+  save(); hide("oEdit"); renderBoard();
+};
+
+/* ====================== Settings ====================== */
+const S=state.settings;
+function openSettings(){
+  loadVoices();
+  $("sRate").value=S.rate;$("sPitch").value=S.pitch;$("sSpeakEach").checked=S.speakEach;$("sClearAfter").checked=S.clearAfter;
+  $("sLayout").value=String(S.layout);$("sCols").value=S.cols;$("sTheme").value=S.theme;$("sLabels").value=S.labels;$("sHomeAfter").checked=S.homeAfter;
+  $("sHold").value=S.hold;$("sDeb").value=S.deb;$("sScan").checked=S.scan;$("sScanMs").value=S.scanMs;
+  $("sVol").value=S.volume??1;$("sVib").checked=!!S.vibrate;$("sInput").value=S.inputStyle||"symbols";$("sCalm").checked=!!S.calm;$("sHi").checked=!!S.highlight;renderProfilePanel();
+  $("sGap").value=S.gap;$("sSym").value=S.symScale;$("sProtect").checked=S.protect;
+  $("sLock").checked=S.lock;$("sCode").value=S.code;$("sData").value="";
+  syncLabels(); show("oSet");
+}
+function syncLabels(){
+  $("sRateV").textContent=(+$("sRate").value).toFixed(2);$("sPitchV").textContent=(+$("sPitch").value).toFixed(2);
+  $("sColsV").textContent=$("sCols").value;$("sHoldV").textContent=$("sHold").value;$("sDebV").textContent=$("sDeb").value;$("sScanV").textContent=$("sScanMs").value;
+  $("sGapV").textContent=$("sGap").value;$("sVolV").textContent=Math.round($("sVol").value*100)+"%";$("sSymV").textContent=Math.round($("sSym").value*100)+"%";
+}
+document.querySelectorAll("#oSet input,#oSet select").forEach(el=>el.addEventListener("input",()=>{
+  syncLabels();
+  Object.assign(S,{volume:+$("sVol").value,vibrate:$("sVib").checked,inputStyle:$("sInput").value,calm:$("sCalm").checked,highlight:$("sHi").checked,gap:+$("sGap").value,symScale:+$("sSym").value,protect:$("sProtect").checked,layout:$("sLayout").value,voice:$("sVoice").value,rate:+$("sRate").value,pitch:+$("sPitch").value,speakEach:$("sSpeakEach").checked,
+    clearAfter:$("sClearAfter").checked,cols:+$("sCols").value,theme:$("sTheme").value,labels:$("sLabels").value,homeAfter:$("sHomeAfter").checked,
+    hold:+$("sHold").value,deb:+$("sDeb").value,scan:$("sScan").checked,scanMs:+$("sScanMs").value,lock:$("sLock").checked,code:$("sCode").value.trim()});
+  applyLook(); save(); if(view==="board") renderBoard();
+}));
+$("sVoice").addEventListener("change",()=>{state.settings.voice=$("sVoice").value;save();say(TEST_PHRASE[curLang()]||TEST_PHRASE.en);});
+$("sClose").onclick=()=>{hide("oSet"); if(S.scan&&!editing) startScan(); else stopScan(); renderBoard();};
+$("sCopy").onclick=async()=>{
+  const {code,...safeSettings}=state.settings;
+  const data=JSON.stringify({app:"TalkBoard AAC",version:2,saved:new Date().toISOString(),boards:state.boards,settings:safeSettings},null,0);
+  $("sData").value=data;
+  try{await navigator.clipboard.writeText(data);toast("Vocabulary copied");}catch(e){$("sData").select();toast("Select the text box and copy it");}
+};
+function importText(txt){
+  try{
+    const d=JSON.parse(txt); if(!d.boards||!d.boards.home) throw 0;
+    state.boards=d.boards;
+    if(d.settings){ const keep={lock:S.lock,code:S.code}; Object.assign(S,DEFAULT_SETTINGS,d.settings,keep); applyLook(); }
+    path=["home"]; save(); renderBoard(); toast("Backup restored"); openSettings();
+  }catch(e){toast("That doesn't look like a TalkBoard vocabulary");}
+}
+$("sImport").onclick=()=>importText($("sData").value);
+$("sFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>importText(r.result);r.readAsText(f);};
+$("sReset").onclick=async()=>{
+  const ok=await ask("Reset vocabulary?","All your custom buttons and folders will be replaced with the starter set.",{okText:"Reset"});
+  if(ok){state.boards=starter();path=["home"];save();renderBoard();toast("Starter vocabulary restored");}
+  show("oSet");
+};
+function applyLook(){
+  document.body.classList.toggle("dark",S.theme==="dark");
+  document.body.classList.toggle("contrast",S.theme==="contrast");
+  document.body.classList.toggle("nolabels",S.labels==="none");
+  document.body.classList.toggle("labeltop",S.labels==="top");
+  document.documentElement.style.setProperty("--cols",S.cols);
+  document.documentElement.style.setProperty("--gap",(S.gap||8)+"px");
+  document.body.classList.toggle("protect",!!S.protect);
+  document.body.classList.toggle("calm",!!S.calm);
+  document.body.classList.toggle("highlight",!!S.highlight);
+}
+
+$("sLayout").innerHTML='<option value="all">Show all on one screen</option>'+TPL_KEYS.map(n=>`<option value="${n}">${tplName(n)} per page</option>`).join("");
+
+/* ====================== Board layout templates (per board) ====================== */
+function miniGrid(n){
+  const [c,r]=TEMPLATES[n]||tplDims(n);
+  return `<div style="display:grid;grid-template-columns:repeat(${c},1fr);grid-template-rows:repeat(${r},1fr);gap:2px;width:100%;aspect-ratio:4/3">${'<i style="background:var(--accent);opacity:.75;border-radius:2px"></i>'.repeat(n)}</div>`;
+}
+function renderPick(){
+  const v=$("lSel").value;
+  $("lPick").innerHTML=["app",...TPL_KEYS.filter(n=>n<=40)].map(k=>`<button class="b" data-l="${k}" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;${String(k)===v?"outline:3px solid var(--accent)":""}">
+    ${k==="app"?'<div style="aspect-ratio:4/3;width:100%;display:flex;align-items:center;justify-content:center;font-size:1.4rem">⚙️</div>':miniGrid(k)}
+    <span style="font-size:.8rem">${k==="app"?"App setting":k}</span></button>`).join("");
+}
+$("nLayout").onclick=()=>{
+  const bd=curBoard();
+  $("lSel").innerHTML='<option value="app">Use app setting</option><option value="all">Show all on one screen</option>'+TPL_KEYS.map(n=>`<option value="${n}">${tplName(n)} per page</option>`).join("");
+  $("lSel").value=bd.layout?String(bd.layout):"app"; $("lFill").checked=false;
+  renderPick(); show("oLayout");
+};
+$("lSel").onchange=renderPick;
+$("lPick").onclick=e=>{const b=e.target.closest("[data-l]");if(b){$("lSel").value=b.dataset.l;renderPick();}};
+$("lCancel").onclick=()=>hide("oLayout");
+$("lSave").onclick=()=>{
+  const bd=curBoard(), v=$("lSel").value;
+  if(v==="app") delete bd.layout; else bd.layout=v==="all"?"all":+v;
+  const N=boardLayout(bd);
+  if($("lFill").checked && N){ while(bd.buttons.length%N!==0 || bd.buttons.length===0) bd.buttons.push({id:nid(),type:"blank",label:""}); }
+  pageOf[curId()]=0; save(); hide("oLayout"); renderBoard();
+  toast(N?`${tplName(N)} per page`:"Showing all buttons");
+};
+
+/* ====================== Printable boards ====================== */
+function buildPrint(){
+  const which=$("prWhich").value, fixed=+$("prSize").value, color=$("prColor").checked;
+  const ids=which==="cur"?[curId()]:["home",...Object.keys(state.boards).filter(k=>k!=="home")];
+  let html="";
+  ids.forEach(id=>{
+    const bd=state.boards[id]; if(!bd) return;
+    const btns=bd.buttons;
+    if(!btns.length) return;
+    let N=fixed||boardLayout(bd)||Math.min(btns.length,30);
+    let [c,r]=TEMPLATES[N]||tplDims(N); if(r>c) [c,r]=[r,c];
+    const sheets=Math.ceil(btns.length/N);
+    const cw=950/c, ch=560/r, m=Math.min(cw,ch);
+    for(let p=0;p<sheets;p++){
+      const part=btns.slice(p*N,(p+1)*N);
+      const cells=part.map(b=>{
+        if(b.type==="blank"||b.hidden) return `<div class="pcell" style="border-style:dashed;border-color:#bbb"></div>`;
+        const bg=color?`background:var(--pc-${b.type==="folder"?"folder":(b.cat||"misc")})`:"";
+        const sym=b.img?`<img src="${b.img}" style="max-height:${m*0.55}px">`:`<span class="s" style="font-size:${m*0.42}px">${b.sym||""}</span>`;
+        const go=b.type==="folder"&&state.boards[b.target]?`<span class="go">→ see “${esc(state.boards[b.target].name)}” page</span>`:"";
+        return `<div class="pcell" style="${bg}">${sym}<span class="t" style="font-size:${Math.max(11,m*0.13)}px">${esc(b.label)}</span>${go}</div>`;
+      }).join("")+'<div></div>'.repeat(N-part.length);
+      html+=`<div class="sheet ${color?"":"nocolor"}"><h4>${esc(bd.name)}<small>TalkBoard AAC${sheets>1?` · sheet ${p+1} of ${sheets}`:""}</small></h4>
+        <div class="pgrid" style="grid-template-columns:repeat(${c},1fr);grid-template-rows:repeat(${r},1fr)">${cells}</div></div>`;
+    }
+  });
+  $("printArea").innerHTML=html||'<p class="hint">No buttons to print.</p>';
+}
+function openPrint(){ buildPrint(); show("oPrint"); }
+["prWhich","prSize","prColor"].forEach(id=>$(id).addEventListener("change",buildPrint));
+$("prClose").onclick=()=>hide("oPrint");
+$("prGo").onclick=()=>{ try{ window.print(); }catch(e){ toast("Printing isn't allowed here – see the note above"); } };
+addEventListener("beforeprint",()=>{ if(!$("oPrint").classList.contains("show")) buildPrint(); });
+$("sPrint").onclick=()=>{ hide("oSet"); openPrint(); };
+$("sGoEdit").onclick=()=>{ hide("oSet"); if(!editing) toggleEdit(); };
+
+/* ====================== Switch scanning ====================== */
+let scanTimer=null, scanIdx=-1, scanPaused=false;
+function scanTargets(){
+  const area=view==="kbd"?[...$("pred").children,...$("keys").children]:[...grid.querySelectorAll("button.cell:not(.blank-slot)")];
+  const pagers=document.body.classList.contains("paged")?[$("pPrev"),$("pNext")].filter(b=>!b.disabled):[];
+  return [...area,...pagers,$("bSpeak"),$("bBack"),$("bClear"),$("nHome"),...(path.length>1&&view==="board"?[$("nBackBoard")]:[]),$("nKbd")];
+}
+function startScan(){
+  stopScan(); if(!S.scan||editing)return; scanIdx=-1;
+  scanTimer=setInterval(()=>{ if(scanPaused)return; const t=scanTargets(); clearHi(); scanIdx=(scanIdx+1)%t.length; t[scanIdx].classList.add("scan-hi"); t[scanIdx].scrollIntoView({block:"nearest"}); },S.scanMs);
+}
+function stopScan(){clearInterval(scanTimer);scanTimer=null;clearHi();}
+function stopScanTemp(){scanPaused=true;}
+function resumeScan(){scanPaused=false;}
+function clearHi(){document.querySelectorAll(".scan-hi").forEach(e=>e.classList.remove("scan-hi"));}
+function scanSelect(){
+  const el=document.querySelector(".scan-hi"); if(!el)return;
+  if(el.classList.contains("cell")) fireCell(el); else el.click();
+  scanIdx=-1; clearHi();
+  if(scanTimer) startScan();
+}
+document.addEventListener("keydown",e=>{
+  if(document.querySelector(".overlay.show")) return;
+  if(S.scan && scanTimer && (e.code==="Space"||e.code==="Enter")){e.preventDefault();scanSelect();}
+});
+document.addEventListener("pointerdown",e=>{
+  if(!S.scan||!scanTimer||document.querySelector(".overlay.show"))return;
+  if(e.target.closest("#nEdit,#nSet"))return;
+  e.preventDefault(); e.stopPropagation(); scanSelect();
+},true);
+document.addEventListener("click",e=>{
+  if(!S.scan||!scanTimer||document.querySelector(".overlay.show"))return;
+  if(e.target.closest("#nEdit,#nSet"))return;
+  e.preventDefault(); e.stopPropagation();
+},true);
+
+function symFor(word){
+  const w=String(word).toLowerCase();
+  const hit=EMOJI_LIB.find(x=>x.k.split(" ").includes(w))||EMOJI_LIB.find(x=>x.k.includes(w))||EMOJI_LIB.find(x=>w.split(/\s+/).some(p=>p.length>2&&x.k.split(" ").includes(p)));
+  return hit?hit.e:"⭐";
+}
+/* ====================== Child profile questionnaire (TB-Q 1.0) & starting-configuration rules (TB-R 1.0) ======================
+   Follows "AAC Child Profile Questionnaire and Recommendation Rules". Output is a trial configuration,
+   not a diagnosis, developmental level or clinical assessment. No age, speech, literacy or cognitive gate. */
+const QV="TB-Q-1.0", RV="TB-R-1.0";
+const LANG_LIST=["en","es","fr","pt","ar","zh","hi","yo","ig","ha","sw","de","it","nl","pl","ru","tr","vi","ko","ja","tl","ur","bn","am","so","fa","he","uk","ro","el"];
+const VOCAB_LANGS=["en"]; // languages that currently have a TalkBoard starter vocabulary
+const OPT_NS=["notsure","🤔","Not sure"], OPT_SK=["skip","⏭️","Skip"], OPT_OT=["other","✏️","Other"];
+const IQ=[
+ {id:"intro",type:"intro"},
+ {id:"Q01",f:"languages",type:"langs",t:"Which languages should be available for the child?",h:"Search and select one or more languages used at home, at school, or with other important people."},
+ {id:"Q02",f:"communication_modes",type:"multi",t:"How does the child communicate now?",h:"Select all that apply. Every current way of communicating stays available — having speech does not exclude using the app.",o:[["speech","🗣️","Spoken words or sentences"],["gesture_sign","🤟","Gestures or signs"],["point_reach","👉","Pointing or reaching"],["face_body","🙂","Facial expressions or body movements"],["sounds","🔊","Sounds"],["pictures_board","🖼️","Pictures or a communication board"],["typing_writing","⌨️","Typing or writing"],["gaze_signal","👁️","Gaze or another agreed signal"]]},
+ {id:"Q03",f:"communication_contexts",type:"multi",t:"When would extra communication choices be helpful?",h:"Select all that apply.",o:[["unfamiliar","🧑‍🤝‍🧑","With unfamiliar people"],["friends","👫","With friends or classmates"],["tired","😮‍💨","When tired or overwhelmed"],["noisy","📢","In noisy settings"],["routines","🗓️","During everyday routines"],["speech_hard","🤐","When speech is hard to use"],["wants_another","✨","The child wants another way to communicate"]]},
+ {id:"Q04",f:"existing_aac",type:"single",t:"Is the child already using AAC?",o:[["works_well","✅","A system that works well"],["adjusting","🔧","A system we are still adjusting"],["past","🕰️","Used AAC in the past"],["new","🌱","New to AAC"]],
+   fu:{when:v=>["works_well","adjusting","past"].includes(v),fields:[["app","Current app or board"],["access","Access method"],["layout","Familiar layout (e.g. 36 buttons, core words on the left)"],["keep","What the child wants to keep"],["change","What the child wants to change"]],note:"Names and notes are optional."}},
+ {id:"Q05",f:"device",type:"single",t:"Which device will the child use?",o:[["ipad","📱","iPad"],["iphone","📱","iPhone"],["android_tablet","📲","Android tablet"],["android_phone","📲","Android phone"],["windows","🖥️","Windows computer"],["mac","💻","Mac"],["chromebook","💻","Chromebook"],["linux","🐧","Supported Linux computer"],["not_chosen","❔","Not chosen yet"]]},
+ {id:"Q06",f:"access_methods",type:"multi",t:"Which selection methods already work for the child?",h:"Select all that apply.",o:[["finger","👆","Finger touch"],["hand_stylus","✋","Whole-hand touch or stylus"],["pointer","🖱️","Mouse, trackball, or head pointer"],["keyboard","⌨️","Physical keyboard"],["switch","🔘","Switch scanning"],["eye_gaze","👁️","Eye gaze on compatible equipment"],["partner","🤝","Partner-assisted pointing or scanning"],["exploring","🔍","Still exploring"]]},
+ {id:"Q07",f:"touch_experience",type:"multi",t:"When using touch, what have you noticed?",h:"Select all that apply. A missed target can reflect the device, positioning, fatigue or an unfamiliar layout — it is not an ability score.",
+   skipIf:a=>{const m=val(a,"access_methods");return Array.isArray(m)&&m.length&&!m.includes("finger")&&!m.includes("hand_stylus")&&!m.includes("exploring");},
+   o:[["reaches","🎯","Usually reaches intended targets"],["neighbors","↔️","Sometimes touches neighboring buttons"],["repeated","👆👆","Repeated or accidental touches"],["hard_areas","📐","Some screen areas are hard to reach"],["fatigue","🔋","Comfort or accuracy changes with fatigue"],["not_tried","➖","Touch has not been tried or is not the usual method"]]},
+ {id:"Q08",f:"access_supports",type:"multi",t:"What already helps the child use the device?",h:"Select all that apply.",o:[["mount","🗜️","Mount or stand"],["seating","💺","Comfortable seating or positioning"],["keyguard","🔲","Keyguard"],["stylus","🖊️","Stylus"],["vision_supports","👓","Glasses or other established vision supports"],["breaks","⏸️","Rest breaks"],["another","➕","Another support"],["none","⭕","No additional support identified",1]],
+   fu:{when:()=>true,fields:[["equipment","Optional: existing switch, eye-gaze or other access equipment and any established settings"]]}},
+ {id:"Q09",f:"visual_preferences",type:"multi",t:"What helps the child see or find choices?",h:"Select all that apply. You'll preview these on the device before anything is applied.",o:[["current_ok","👍","Current display works comfortably"],["larger","🔍","Larger pictures or text"],["spacing","↔️","Greater spacing"],["plain_contrast","🌓","A plain background or different contrast"],["spoken_desc","🗣️","Spoken descriptions of choices"],["specialist_plan","📋","An existing specialist display plan"],["difficult","⚠️","Visual choices remain difficult to access"]]},
+ {id:"Q10",f:"audio_preferences",type:"multi",t:"What would help with spoken output?",h:"Select all that apply.",o:[["volume","🔉","Adjustable volume"],["speed","⏩","A different speaking speed"],["visible_text","🔤","Visible text or symbols with speech"],["headphones","🎧","Headphones when appropriate"],["spoken_labels","🗣️","Optional spoken button labels"],["output_hard","⚠️","Hearing or understanding output is difficult"],["quiet_display","🤫","A quiet display option"]]},
+ {id:"Q11",f:"sensory_preferences",type:"multi",t:"Which feedback options does the child prefer?",h:"Select all that apply.",o:[["minimal_motion","🧘","Minimal movement on screen"],["no_deco_sounds","🔕","No decorative sounds"],["clear_highlight","🟦","Clear visual highlighting"],["vibration","📳","Optional vibration if supported"],["spoken_labels","🗣️","Spoken labels if wanted"],["no_pref","⭕","No preference identified yet",1]]},
+ {id:"Q12",f:"voice_choice",type:"voice",t:"Which voice feels comfortable for the child?",h:"Preview the voices installed on this device for each requested language. Choose a voice and a comfortable speed, keep a familiar voice, or choose later."},
+ {id:"Q13",f:"literacy_experience",type:"multi",t:"What has the child explored with letters and writing?",h:"Select all that apply. The alphabet stays available whatever you answer — this question does not unlock or block anything.",o:[["letters","🔤","Exploring letters"],["some_words","📝","Recognizing some written words"],["spelling","✍️","Spelling some words"],["typed_msgs","⌨️","Creating typed messages"],["writing_support","🤝","Using writing with support"],["not_yet","➖","Not explored yet",1]]},
+ {id:"Q14",f:"input_preference",type:"single",t:"How would the child like to build messages?",o:[["symbols_words","🖼️","Pictures with written words"],["typing","⌨️","Typing with optional picture support"],["mix","🔀","A mix of pictures and typing"],["explore","🔍","Would like to explore the choices"]]},
+ {id:"Q15",f:"communication_priorities",type:"multi",t:"What would the child like more opportunities to communicate?",h:"Select all that apply. Every communication function stays available — priorities never create a request-only board.",o:[["help_break","🆘","Ask for help or a break"],["refuse","✋","Refuse, disagree, or say stop"],["feelings","😊","Express feelings or discomfort"],["request","🙏","Request something"],["questions","❓","Ask questions"],["share_stories","📖","Share ideas or tell stories"],["joke_comment","😄","Joke, comment, or talk with friends"],["learning","🎓","Participate in learning"]]},
+ {id:"Q16",f:"personal_vocabulary",type:"vocab",t:"Which people, topics, and routines matter to the child?",h:"Optional. These are added alongside the broad vocabulary — common words are never replaced. You can add photos later in Edit mode.",
+   cats:[["people","Familiar people or nicknames",["Mom","Dad","Grandma","Grandpa","Brother","Sister","Teacher","Friend"]],["interests","Favorite activities and topics",["music","soccer","dinosaurs","drawing","bubbles","cars","dance","books","swimming","video games","animals","cooking"]],["places","Important places",["park","school","church","mosque","pool","library","store","grandma's house","playground"]],["routines","Daily routines",["breakfast","bath time","getting dressed","bedtime","car ride","circle time","snack","brush teeth"]],["words","Words the child wants to add",[]]]},
+ {id:"Q17",f:"use_settings",type:"multi",t:"Where will the child want to communicate with the app?",h:"Select all that apply.",o:[["home","🏠","Home"],["school","🏫","School or childcare"],["therapy","🧩","Therapy sessions"],["community","🛒","Community activities"],["travel","✈️","Travel"],["another","➕","Another setting"]]},
+ {id:"Q18",f:"connectivity",type:"single",t:"How reliable is internet access in those settings?",h:"Core communication never depends on the internet.",o:[["usually","📶","Usually available"],["sometimes","📉","Sometimes unavailable"],["rarely","🚫","Rarely or never available"]]},
+ {id:"Q19",f:"communication_partners",type:"multi",t:"Who could help the child explore the app?",h:"Select all that apply. Naming someone here does not invite them or give them access.",o:[["parent","👪","Parent or caregiver"],["teacher","🧑‍🏫","Teacher or school staff"],["slp","🗣️","Speech-language pathologist"],["at_specialist","🛠️","Assistive technology specialist"],["familiar","🧑","Another familiar person"],["none_arranged","⭕","Support has not been arranged",1]],
+   fu:{when:()=>true,single:["guided","Would guided setup help?",[["yes","Yes"],["no","No"],["notsure","Not sure"]]]}},
+ {id:"PREVIEW",type:"preview",t:"Optional preview on this device"},
+ {id:"Q20",f:"child_response",type:"single",t:"After the preview, what does the child indicate?",h:"Respect the child's choice. A silent or unclear response is not approval.",noGeneric:true,o:[["try","👍","Would like to try this"],["change","🔧","Would like something changed"],["another","🔀","Would like another option"],["not_now","⏸️","Not now"],["unclear","❔","A clear preference has not been observed yet"]]},
+ {id:"RESULT",type:"result",t:"Suggested trial setup"},
+ {id:"ADJUST",type:"adjust",t:"Adjust settings"},
+ {id:"COMPARE",type:"compare",t:"Compare another option"}
+];
+const iw={step:0,a:{},prev:null,cfg:null,alt:null};
+const val=(a,f)=>a[f]?a[f].v:undefined;
+const isUnknown=(a,f)=>!a[f]||a[f].v===undefined||a[f].v==="notsure"||a[f].v==="skip"||(Array.isArray(a[f].v)&&(!a[f].v.length||a[f].v.includes("notsure")||a[f].v.includes("skip")));
+const has=(a,f,code)=>{const v=val(a,f);return Array.isArray(v)?v.includes(code):v===code;};
+const nickName=()=>((iw.a.profile||{}).nickname||"").trim()||"the child";
+function newAnswers(){return {profile:{nickname:"",age_band:"",respondent:"",child_contributed:""}};}
+function detectDevice(){
+  const ua=navigator.userAgent||"", touch=navigator.maxTouchPoints>1;
+  if(/CrOS/.test(ua)) return "chromebook";
+  if(/iPad/.test(ua)||(/Macintosh/.test(ua)&&touch)) return "ipad";
+  if(/iPhone|iPod/.test(ua)) return "iphone";
+  if(/Android/.test(ua)) return /Mobile/.test(ua)?"android_phone":"android_tablet";
+  if(/Windows/.test(ua)) return "windows";
+  if(/Macintosh/.test(ua)) return "mac";
+  if(/Linux/.test(ua)) return "linux";
+  return "";
+}
+const DEVICE_NAMES=Object.fromEntries(IQ.find(q=>q.id==="Q05").o.map(o=>[o[0],o[2]]));
+function openWizard(){
+  $("wNext").onclick=()=>iwGo(1); $("wSkip").onclick=()=>{ saveProfile("Draft",iw.cfg||buildConfig()); hide("oWiz"); toast("Saved as a draft. Nothing was changed."); };
+  const P=state.profile&&state.profile.version===QV?state.profile:null;
+  iw.a=P?JSON.parse(JSON.stringify(P.answers)):newAnswers();
+  iw.prev=P&&P.observation?JSON.parse(JSON.stringify(P.observation)):null;
+  iw.step=0; iw.cfg=null; iw.alt=null; renderIW(); show("oWiz");
+}
+function visibleSteps(){return IQ.filter(q=>!["RESULT","ADJUST","COMPARE"].includes(q.id));}
+function renderIW(){
+  const q=IQ[iw.step], a=iw.a, B=$("wBody");
+  const vs=visibleSteps(), qi=vs.indexOf(q);
+  $("wStepL").textContent=q.id.startsWith("Q")?`${q.id} · ${qi} of ${vs.length-1}`:q.type==="intro"?"Child profile":q.type==="preview"?"Preview":"Suggested trial";
+  $("wBar").style.width=Math.round(Math.max(0,qi)/(vs.length-1)*100)+"%";
+  $("wBack").style.visibility=iw.step?"visible":"hidden";
+  $("wNext").style.display=["result","compare"].includes(q.type)?"none":"";
+  $("wNext").textContent=q.type==="intro"?"Start ▶":q.type==="adjust"?"Save adjustments ▶":"Next ▶";
+  $("wSkip").textContent="Save for later";
+  let h=q.t?`<h2>${esc(q.t)}</h2>`:"";
+  if(q.h) h+=`<p class="hint">${esc(q.h)}</p>`;
+  if(q.type==="intro") h=introHTML();
+  if(q.type==="single"||q.type==="multi") h+=optsHTML(q,a);
+  if(q.fu) h+=followHTML(q,a);
+  if(q.type==="langs") h+=langsHTML(a);
+  if(q.type==="voice") h+=voiceHTML(a);
+  if(q.type==="vocab") h+=vocabHTML(q,a);
+  if(q.type==="preview") h+=previewHTML();
+  if(q.type==="result") h+=resultHTML2();
+  if(q.type==="adjust") h+=adjustHTML();
+  if(q.type==="compare") h+=compareHTML();
+  B.innerHTML=h; B.scrollTop=0; $("oWiz").querySelector(".dlg").scrollTop=0;
+  if(q.type==="preview") drawPreview();
+}
+function introHTML(){
+  const p=iw.a.profile||{};
+  const sel=(id,opts,cur)=>`<select id="${id}"><option value="">—</option>${opts.map(([v,l])=>`<option value="${v}" ${v===cur?"selected":""}>${l}</option>`).join("")}</select>`;
+  return `<h2>Tell us what helps your child communicate</h2>
+  <p>Answer together when possible. Choose <b>Not sure</b> or <b>Skip</b> whenever you need to. You can change these answers and try another setup at any time.</p>
+  <p class="hint">The result is a trial setup for the child and their team to try and adjust — not a diagnosis, level or clinical assessment. AAC has no age, speech, reading or other prerequisite. For complex access needs, involve an AAC-experienced professional.</p>
+  <h3>Optional profile details</h3>
+  <div class="row"><label>Nickname</label><input type="text" id="pNick" value="${esc(p.nickname||"")}" placeholder="Optional"></div>
+  <div class="row"><label>Age band</label>${sel("pAge",[["0_2","0–2"],["3_5","3–5"],["6_9","6–9"],["10_13","10–13"],["14_17","14–17"],["18_plus","18+"]],p.age_band)}</div>
+  <div class="row"><label>Person completing the form</label>${sel("pResp",[["parent","Parent or caregiver"],["teacher","Teacher or school staff"],["slp","Speech-language pathologist"],["bcba","Behavior analyst / therapist"],["child","The child"],["other","Someone else"]],p.respondent)}</div>
+  <div class="row"><label>Did the child contribute?</label>${sel("pContrib",[["yes","Yes"],["partly","Partly"],["no","No"]],p.child_contributed)}</div>
+  <p class="hint">Age is used only for respectful presentation. Birth date and diagnosis are not needed. Choosing a support person here doesn't invite them or give them access.</p>`;
+}
+function optsHTML(q,a){
+  const cur=a[q.f]?a[q.f].v:(q.type==="multi"?[]:undefined);
+  const list=q.noGeneric?q.o:[...q.o,OPT_NS,OPT_SK,OPT_OT];
+  const on=v=>q.type==="multi"?(cur||[]).includes(v):cur===v||(v==="other"&&a[q.f]&&a[q.f].other);
+  let h=`<div class="opts">${list.map(([v,i,l,x])=>`<button class="opt ${on(v)?"on":""} ${["notsure","skip","other"].includes(v)?"gen":""}" data-v="${v}"><span class="oi">${i}</span><span><b>${esc(l)}</b></span></button>`).join("")}</div>`;
+  if(a[q.f]&&(a[q.f].other||(Array.isArray(cur)&&cur.includes("other"))||cur==="other")) h+=`<div class="row"><label>Other (optional note)</label><input type="text" id="wOther" value="${esc(a[q.f].note||"")}"></div>`;
+  if(q.skipIf&&q.skipIf(a)) h=`<p class="recbox">Touch isn't one of the selection methods you chose, so this question can be skipped. A skipped answer is not read as a touch difficulty or as evidence of reliable touch.</p>`+h;
+  return h;
+}
+function followHTML(q,a){
+  const v=val(a,q.f), fu=q.fu; if(!fu.when(v)) return "";
+  const d=(a[q.f]&&a[q.f].follow)||{};
+  let h=`<h3>Follow-up${fu.note?` <small style="text-transform:none">· ${esc(fu.note)}</small>`:""}</h3>`;
+  (fu.fields||[]).forEach(([k,l])=>h+=`<div class="row"><label style="min-width:0;flex-basis:100%">${esc(l)}</label><input type="text" data-fu="${k}" value="${esc(d[k]||"")}"></div>`);
+  if(fu.single){ const [k,l,opts]=fu.single; h+=`<div class="row"><label>${esc(l)}</label>${opts.map(([ov,ol])=>`<button class="chipb ${d[k]===ov?"on":""}" data-fus="${k}" data-v="${ov}">${ol}</button>`).join("")}</div>`; }
+  return h;
+}
+function langsHTML(a){
+  const cur=val(a,"languages")||[];
+  const avail=new Set(voices.map(v=>baseLang(v.lang)));
+  const all=[...new Set([...cur.filter(x=>!["notsure","skip"].includes(x)),devLang(),...LANG_LIST,...avail])];
+  return `<div class="row"><input type="text" id="wLangFind" placeholder="Search languages…"></div>
+  <div class="chips" id="wLangChips">${all.map(l=>`<button class="chipb ${cur.includes(l)?"on":""}" data-lang="${l}" data-name="${esc(langName(l).toLowerCase())}">${esc(langName(l))}${avail.has(l)?" 🔊":""}${VOCAB_LANGS.includes(l)?" 📚":""}</button>`).join("")}</div>
+  <div class="chips"><button class="chipb ${cur.includes("notsure")?"on":""}" data-lang="notsure">🤔 Not sure</button><button class="chipb ${cur.includes("skip")?"on":""}" data-lang="skip">⏭️ Skip</button></div>
+  <p class="hint">🔊 = a voice is installed on this device · 📚 = TalkBoard has a starter vocabulary in this language (English only for now). Anything missing is kept in the profile and flagged for review — the app won't silently swap in another language.</p>`;
+}
+function reqLangs(a){ const v=(val(a,"languages")||[]).filter(x=>!["notsure","skip"].includes(x)); return v.length?v:[]; }
+function voiceHTML(a){
+  const langs=reqLangs(a).length?reqLangs(a):[curLang()];
+  const vc=(a.voice_choice&&a.voice_choice.v&&typeof a.voice_choice.v==="object")?a.voice_choice.v:{};
+  let h="";
+  langs.forEach(l=>{
+    const list=voices.filter(v=>baseLang(v.lang)===l), c=vc[l]||{mode:"",voice:"",rate:state.settings.rate,familiar:""};
+    h+=`<div class="recbox"><h3>${esc(langName(l))}</h3>`;
+    if(!list.length) h+=`<p>⚠️ No ${esc(langName(l))} voice is installed on this device. The language stays in the profile and is flagged for review. <a href="#" onclick="return false" class="hint">See Settings → “Add voices on the device”.</a></p>`;
+    else h+=`<div class="row"><label>Voice</label><select data-vl="${l}" data-k="voice"><option value="">Best match</option>${list.map(v=>`<option value="${esc(v.voiceURI)}" ${v.voiceURI===c.voice?"selected":""}>${v.localService?"✈️":"🌐"} ${esc(v.name)} (${esc(normLang(v.lang))})</option>`).join("")}</select><button class="b" data-vtest="${l}">▶ Preview</button></div>`;
+    h+=`<div class="row"><label>Speed</label><input type="range" min="0.5" max="1.6" step="0.05" value="${c.rate||0.95}" data-vl="${l}" data-k="rate"></div>
+    <div class="chips">${[["use","Use this voice"],["familiar","Keep a familiar voice"],["later","Choose later"]].map(([m,lab])=>`<button class="chipb ${c.mode===m?"on":""}" data-vmode="${m}" data-vl="${l}">${lab}</button>`).join("")}</div>
+    ${c.mode==="familiar"?`<div class="row"><input type="text" data-vl="${l}" data-k="familiar" value="${esc(c.familiar||"")}" placeholder="Name of the familiar voice (optional)"></div>`:""}</div>`;
+  });
+  return h+`<p class="hint">✈️ = installed on the device (usually works offline) · 🌐 = needs internet. Offline speech is only marked as tested after a real test with the internet off (Settings → Child profile → Test offline speech).</p>`;
+}
+function vocabHTML(q,a){
+  const cur=(a[q.f]&&a[q.f].v&&typeof a[q.f].v==="object")?a[q.f].v:{};
+  return q.cats.map(([k,l,sug])=>{
+    const sel=cur[k]||[]; const all=[...new Set([...sug,...sel])];
+    return `<h3>${esc(l)}</h3><div class="chips">${all.map(s=>`<button class="chipb ${sel.includes(s)?"on":""}" data-vc="${k}" data-c="${esc(s)}">${k!=="people"?symFor(s)+" ":""}${esc(s)}</button>`).join("")}</div>
+    <div class="row"><input type="text" data-vadd="${k}" placeholder="Add…"><button class="b" data-vaddb="${k}">Add</button></div>`;
+  }).join("");
+}
+
+/* ---- device preview (layout, appearance, activation, access checks) ---- */
+const PREV_SIZES=[12,24,48];
+function defaultPrev(){
+  const a=iw.a, sugg={gap:has(a,"visual_preferences","spacing"),larger:has(a,"visual_preferences","larger"),contrast:has(a,"visual_preferences","plain_contrast")};
+  return {tried:false,layout:+state.settings.layout||24,gap:state.settings.gap||8,symScale:state.settings.symScale||1,theme:state.settings.theme||"light",hold:state.settings.hold||0,deb:state.settings.deb||0,
+          supports:[],comfort:"",switch_test:"",eyegaze_note:"",suggested:sugg};
+}
+function previewHTML(){
+  const p=iw.prev=iw.prev||defaultPrev(), a=iw.a, dev=detectDevice(), chosen=val(a,"device");
+  const touchNotes=(val(a,"touch_experience")||[]).filter(x=>["neighbors","repeated","hard_areas","fatigue"].includes(x));
+  const sup=(val(a,"access_supports")||[]).filter(x=>!["none","notsure","skip","other"].includes(x));
+  const supName=Object.fromEntries(IQ.find(q=>q.id==="Q08").o.map(o=>[o[0],o[2]]));
+  let h=`<p>Invite ${esc(nickName())} to explore a self-chosen message on <b>this</b> device, with their usual supports. A partner may model their own message and wait. Stop or pause whenever the child wishes, and don't guide their hand. This is an access and preference observation, not a test.</p>`;
+  if(chosen&&dev&&chosen!=="not_chosen"&&chosen!==dev) h+=`<p class="recbox">ℹ️ You're previewing on ${esc(DEVICE_NAMES[dev]||dev)}, but the child will use ${esc(DEVICE_NAMES[chosen]||chosen)}. Please repeat this preview on that device — a result on one screen size doesn't confirm another.</p>`;
+  h+=`<div class="row"><label>Buttons per page</label>${PREV_SIZES.map(n=>`<button class="chipb ${p.layout===n?"on":""}" data-pl="${n}">${n}</button>`).join("")}<select id="pvMore"><option value="">Other sizes…</option>${TPL_KEYS.map(n=>`<option value="${n}" ${p.layout===n&&!PREV_SIZES.includes(n)?"selected":""}>${n}</option>`).join("")}<option value="all">Show all</option></select></div>
+  <p class="hint">12, 24 and 48 are starting options to try, not language levels. The full vocabulary stays reachable on every size (page arrows and folders).</p>
+  <div id="pvGrid" style="height:min(46vh,420px);display:grid;gap:var(--pgap,8px);margin:8px 0;padding:6px;border-radius:12px;background:var(--bg)"></div>
+  <div class="row"><label>Space between buttons</label><input type="range" id="pvGap" min="2" max="30" value="${p.gap}">${p.suggested.gap?"<small>suggested to try (Q09)</small>":""}</div>
+  <div class="row"><label>Symbol size</label><input type="range" id="pvSym" min="0.6" max="1.4" step="0.05" value="${p.symScale}">${p.suggested.larger?"<small>suggested to try (Q09)</small>":""}</div>
+  <div class="row"><label>Background / contrast</label><select id="pvTheme">${[["light","Light"],["dark","Dark, plain"],["contrast","High contrast"]].map(([v,l])=>`<option value="${v}" ${p.theme===v?"selected":""}>${l}</option>`).join("")}</select>${p.suggested.contrast?"<small>suggested to try (Q09)</small>":""}</div>`;
+  if(touchNotes.length||p.hold||p.deb) h+=`<div class="recbox"><h3>Touch activation (optional)</h3><p class="hint">You noted: ${touchNotes.map(x=>esc(IQ.find(q=>q.id==="Q07").o.find(o=>o[0]===x)[2].toLowerCase())).join("; ")||"—"}. Try these only if they help; nothing changes unless you set it here.</p>
+    <div class="row"><label>Hold to select (ms) <span id="pvHoldV">${p.hold}</span></label><input type="range" id="pvHold" min="0" max="1500" step="100" value="${p.hold}"></div>
+    <div class="row"><label>Ignore repeat taps (ms) <span id="pvDebV">${p.deb}</span></label><input type="range" id="pvDeb" min="0" max="1500" step="100" value="${p.deb}"></div></div>`;
+  const am=val(a,"access_methods")||[];
+  if(am.includes("switch")) h+=`<div class="recbox"><h3>🔘 Switch check</h3><p>Connect the switch the way it's normally used (most switch interfaces act as a keyboard or mouse). Press <b>Start check</b>, then press the switch.</p>
+    <button class="b" id="pvSw">Start check</button> <b id="pvSwR">${p.switch_test==="passed"?"✅ Switch press detected":p.switch_test==="failed"?"❌ No press detected":""}</b></div>`;
+  if(am.includes("eye_gaze")) h+=`<div class="recbox"><h3>👁️ Eye gaze</h3><p>TalkBoard has no built-in eye tracking, so eye gaze is <b>not enabled</b> here. Some devices can move a pointer with the eyes (for example iPadOS Eye Tracking or Windows Eye Control with compatible hardware) and use “Hold to select” as dwell — this has <b>not been checked</b> on this device. An access review is suggested, and current communication methods stay available.</p></div>`;
+  if(sup.length) h+=`<div class="row"><label>Supports used now</label>${sup.map(s=>`<button class="chipb ${p.supports.includes(s)?"on":""}" data-psup="${s}">${esc(supName[s])}</button>`).join("")}</div>`;
+  h+=`<div class="row"><label>Access comfort observed</label>${[["comfortable","Comfortable"],["some_difficulty","Some difficulty"],["hard","Hard"],["not_tried","Not tried"],["unclear","Unclear"]].map(([v,l])=>`<button class="chipb ${p.comfort===v?"on":""}" data-pcom="${v}">${l}</button>`).join("")}</div>`;
+  return h;
+}
+function drawPreview(){
+  const p=iw.prev, g=$("pvGrid"); if(!g) return;
+  const N=p.layout==="all"?Math.min(curBoardBtns().length,60):p.layout;
+  const [c,r]=TEMPLATES[N]||tplDims(N);
+  g.style.gridTemplateColumns=`repeat(${c},1fr)`; g.style.gridTemplateRows=`repeat(${r},1fr)`; g.style.setProperty("--pgap",p.gap+"px");
+  g.className=p.theme==="dark"?"pv-dark":p.theme==="contrast"?"pv-contrast":"";
+  const btns=curBoardBtns().slice(0,N);
+  g.innerHTML=btns.map(b=>`<button class="cell ${b.type==="folder"?"folder":"cat-"+(b.cat||"misc")}" data-say="${esc(b.speak||b.label)}" style="min-height:0">${b.img?`<img class="ph" src="${b.img}">`:`<span class="s">${b.sym||""}</span>`}<span class="t">${esc(b.label)}</span></button>`).join("")+'<div></div>'.repeat(Math.max(0,N-btns.length));
+  requestAnimationFrame(()=>{ const cell=g.querySelector(".cell"); if(!cell) return; const rc=cell.getBoundingClientRect(), m=Math.min(rc.width,rc.height);
+    g.style.setProperty("--sym",Math.max(14,Math.min(m*0.5*p.symScale,m*0.85))+"px"); g.style.setProperty("--lbl",Math.max(10,Math.min(m*0.13,rc.width*0.11,40))+"px"); });
+}
+const curBoardBtns=()=>state.boards.home.buttons.filter(b=>b.type!=="blank"&&!b.hidden);
+let pvLast=0, pvHoldT=null;
+function pvActivate(el){ const now=Date.now(); if(now-pvLast<iw.prev.deb) return; pvLast=now; iw.prev.tried=true; say(el.dataset.say); el.animate&&el.animate([{transform:"scale(.94)"},{transform:"scale(1)"}],{duration:160}); }
+
+/* ---- event handling ---- */
+$("wBody").addEventListener("click",e=>{
+  const q=IQ[iw.step], a=iw.a, t=e.target;
+  const o=t.closest(".opt");
+  if(o&&q.f){
+    const v=o.dataset.v, excl=["notsure","skip"].includes(v)||(q.o.find(x=>x[0]===v)||[])[3];
+    a[q.f]=a[q.f]||{};
+    if(q.type==="multi"){
+      let cur=Array.isArray(a[q.f].v)?a[q.f].v.slice():[];
+      if(cur.includes(v)) cur=cur.filter(x=>x!==v);
+      else if(excl) cur=[v];                                   // Not sure, Skip and None clear other answers
+      else cur=[...cur.filter(x=>!["notsure","skip"].includes(x)&&!(q.o.find(y=>y[0]===x)||[])[3]),v]; // Other may accompany real choices
+      a[q.f].v=cur; a[q.f].status=cur.includes("skip")?"skipped":cur.includes("notsure")?"unknown":"answered";
+    } else {
+      if(v==="other"){ a[q.f].other=!a[q.f].other; if(a[q.f].other) a[q.f].v="other"; }
+      else { a[q.f].v=v; a[q.f].other=false; }
+      a[q.f].status=v==="skip"?"skipped":v==="notsure"?"unknown":"answered";
+    }
+    iw.cfg=null; renderIW(); return;
+  }
+  if(t.dataset.fus){ const f=a[q.f]=a[q.f]||{}; f.follow=f.follow||{}; f.follow[t.dataset.fus]=t.dataset.v; renderIW(); return; }
+  if(t.dataset.lang){
+    const l=t.dataset.lang; a.languages=a.languages||{v:[]}; let cur=a.languages.v||[];
+    if(cur.includes(l)) cur=cur.filter(x=>x!==l); else if(["notsure","skip"].includes(l)) cur=[l]; else cur=[...cur.filter(x=>!["notsure","skip"].includes(x)),l];
+    a.languages.v=cur; a.languages.status=cur.includes("skip")?"skipped":cur.includes("notsure")||!cur.length?"unknown":"answered"; renderIW(); return;
+  }
+  if(t.dataset.vtest){ const l=t.dataset.vtest, c=voiceSel(l); const keep={...state.settings}; Object.assign(state.settings,{lang:l,accent:"",voice:c.voice||"",rate:+c.rate||0.95}); say(TEST_PHRASE[l]||TEST_PHRASE.en); Object.assign(state.settings,{lang:keep.lang,accent:keep.accent,voice:keep.voice,rate:keep.rate}); return; }
+  if(t.dataset.vmode){ const c=voiceSel(t.dataset.vl); c.mode=c.mode===t.dataset.vmode?"":t.dataset.vmode; renderIW(); return; }
+  if(t.dataset.vc){ const k=t.dataset.vc, s=t.dataset.c, V=vocabSel(); V[k]=V[k]||[]; V[k]=V[k].includes(s)?V[k].filter(x=>x!==s):[...V[k],s]; renderIW(); return; }
+  if(t.dataset.vaddb){ const k=t.dataset.vaddb, inp=document.querySelector(`[data-vadd="${k}"]`), s=inp.value.trim(); if(s){const V=vocabSel();V[k]=V[k]||[];if(!V[k].includes(s))V[k].push(s);renderIW();const n=document.querySelector(`[data-vadd="${k}"]`);n&&n.focus();} return; }
+  if(t.dataset.pl){ iw.prev.layout=+t.dataset.pl; renderIW(); return; }
+  if(t.dataset.psup){ const s=t.dataset.psup, P=iw.prev; P.supports=P.supports.includes(s)?P.supports.filter(x=>x!==s):[...P.supports,s]; renderIW(); return; }
+  if(t.dataset.pcom){ iw.prev.comfort=iw.prev.comfort===t.dataset.pcom?"":t.dataset.pcom; if(["comfortable","some_difficulty","hard"].includes(iw.prev.comfort)) iw.prev.tried=true; renderIW(); return; }
+  if(t.id==="pvSw"){ t.textContent="Waiting for a switch press…"; const done=ok=>{document.removeEventListener("keydown",kh,true);clearTimeout(tm);iw.prev.switch_test=ok?"passed":"failed";renderIW();};
+    const kh=ev=>{ev.preventDefault();ev.stopPropagation();done(true);}; document.addEventListener("keydown",kh,true); const tm=setTimeout(()=>done(false),10000); return; }
+  const cell=t.closest("#pvGrid .cell"); if(cell&&!iw.prev.hold) pvActivate(cell);
+  if(t.dataset.act) resultAction(t.dataset.act, t.dataset.arg);
+});
+$("wBody").addEventListener("pointerdown",e=>{ const cell=e.target.closest("#pvGrid .cell"); if(!cell||!iw.prev||!iw.prev.hold) return; pvHoldT=setTimeout(()=>{pvHoldT=null;pvActivate(cell);},iw.prev.hold); });
+["pointerup","pointerleave","pointercancel"].forEach(ev=>$("wBody").addEventListener(ev,()=>{clearTimeout(pvHoldT);pvHoldT=null;}));
+function voiceSel(l){ const a=iw.a; a.voice_choice=a.voice_choice||{v:{}}; if(typeof a.voice_choice.v!=="object"||!a.voice_choice.v) a.voice_choice.v={}; a.voice_choice.v[l]=a.voice_choice.v[l]||{mode:"",voice:"",rate:0.95,familiar:""}; a.voice_choice.status="answered"; return a.voice_choice.v[l]; }
+function vocabSel(){ const a=iw.a; a.personal_vocabulary=a.personal_vocabulary||{v:{}}; if(typeof a.personal_vocabulary.v!=="object") a.personal_vocabulary.v={}; a.personal_vocabulary.status="answered"; return a.personal_vocabulary.v; }
+$("wBody").addEventListener("input",e=>{
+  const t=e.target, q=IQ[iw.step], a=iw.a, p=iw.prev;
+  if(t.id==="pNick") a.profile.nickname=t.value;
+  if(t.id==="wOther") a[q.f].note=t.value;
+  if(t.dataset.fu){ const f=a[q.f]=a[q.f]||{}; f.follow=f.follow||{}; f.follow[t.dataset.fu]=t.value; }
+  if(t.id==="wLangFind"){ const s=t.value.trim().toLowerCase(); document.querySelectorAll("#wLangChips .chipb").forEach(c=>c.style.display=!s||c.dataset.name.includes(s)||c.dataset.lang.startsWith(s)?"":"none"); }
+  if(t.dataset.vl&&t.dataset.k){ const c=voiceSel(t.dataset.vl); c[t.dataset.k]=t.dataset.k==="rate"?+t.value:t.value; if(t.dataset.k==="voice"&&!c.mode) c.mode="use"; }
+  if(p&&t.id==="pvGap"){p.gap=+t.value;drawPreview();}
+  if(p&&t.id==="pvSym"){p.symScale=+t.value;drawPreview();}
+  if(p&&t.id==="pvHold"){p.hold=+t.value;$("pvHoldV").textContent=t.value;}
+  if(p&&t.id==="pvDeb"){p.deb=+t.value;$("pvDebV").textContent=t.value;}
+  if(t.closest("#adjForm")) readAdjust();
+});
+$("wBody").addEventListener("change",e=>{
+  const t=e.target, a=iw.a;
+  if(t.id==="pAge") a.profile.age_band=t.value; if(t.id==="pResp") a.profile.respondent=t.value; if(t.id==="pContrib") a.profile.child_contributed=t.value;
+  if(t.id==="pvTheme"){iw.prev.theme=t.value;drawPreview();}
+  if(t.id==="pvMore"&&t.value){iw.prev.layout=t.value==="all"?"all":+t.value;renderIW();}
+  if(t.dataset.vl&&t.dataset.k==="voice"){ const c=voiceSel(t.dataset.vl); c.voice=t.value; c.mode="use"; renderIW(); }
+  if(t.closest("#adjForm")) readAdjust();
+});
+$("wBody").addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.dataset.vadd){e.preventDefault();document.querySelector(`[data-vaddb="${e.target.dataset.vadd}"]`).click();} });
+function markSkippedIfEmpty(q){
+  if(!q.f||["voice","vocab"].includes(q.type)) return;
+  const a=iw.a; if(!a[q.f]||a[q.f].v===undefined||(Array.isArray(a[q.f].v)&&!a[q.f].v.length)) a[q.f]={v:q.type==="multi"||q.type==="langs"?[]:undefined,status:"skipped",auto:true};
+}
+function iwGo(d){
+  const q=IQ[iw.step];
+  if(d>0) markSkippedIfEmpty(q);
+  if(q.type==="adjust"&&d>0){ readAdjust(); iw.step=IQ.findIndex(x=>x.id==="RESULT"); renderIW(); return; }
+  if((q.type==="result"||q.type==="compare")&&d<0){ iw.step=IQ.findIndex(x=>x.id==="Q20"); renderIW(); return; }
+  if(q.type==="adjust"&&d<0){ iw.step=IQ.findIndex(x=>x.id==="RESULT"); renderIW(); return; }
+  let n=iw.step+d;
+  while(IQ[n]&&IQ[n].skipIf&&IQ[n].skipIf(iw.a)){ if(d>0){ iw.a[IQ[n].f]={v:[],status:"skipped",reason:"touch not used"}; } n+=d; }
+  if(IQ[n]&&IQ[n].id==="RESULT") iw.cfg=null;
+  iw.step=Math.max(0,Math.min(IQ.findIndex(x=>x.id==="RESULT"),n)); renderIW();
+}
+$("wNext").onclick=()=>iwGo(1);
+$("wBack").onclick=()=>iwGo(-1);
+$("wSkip").onclick=()=>{ saveProfile("Draft",iw.cfg||buildConfig()); hide("oWiz"); toast("Saved as a draft. Nothing was changed."); };
+
+const checkName=k=>{ const m=k.match(/^(voice|vocabulary|offline_speech)_(.+)$/); if(m) return `${{voice:"voice",vocabulary:"vocabulary",offline_speech:"offline speech"}[m[1]]} (${langName(m[2])})`; return k.replace(/_/g," "); };
+/* ---- the rules (R01–R14) ---- */
+const LAYOUT_OPTS=[12,24,48];
+function buildConfig(override){
+  const a=iw.a, p=iw.prev||defaultPrev(), cfg={reasons:[],reviews:new Set(),checks:{},unknowns:[],conflicts:[],guidance:[]};
+  const R=(id,txt)=>cfg.reasons.push([id,txt]);
+  // R01 — every profile
+  R("R01","Every setup includes broad vocabulary (core words, describing, feelings, questions, refusing), a place for personal words, the ABC keyboard and offline preparation. The child's current ways of communicating stay available.");
+  // R02 — existing system
+  const ex=val(a,"existing_aac"), fu=(a.existing_aac&&a.existing_aac.follow)||{};
+  cfg.vocab_action="add"; // never replace boards without an explicit choice
+  if(["works_well","adjusting"].includes(ex)){
+    R("R02",`A ${ex==="works_well"?"helpful":"current"} AAC system was reported${fu.app?` (${fu.app})`:""}. Its organization and access settings are kept where TalkBoard supports them; changing or migrating the layout needs an explicit choice.`);
+    if(fu.app) cfg.reviews.add("existing system migration");
+  }
+  // R03–R05 — input style
+  const ip=val(a,"input_preference");
+  if(ip==="symbols_words"){cfg.input_style="symbols";R("R03","Pictures with written words was the selected input preference, so a symbol-and-text trial is proposed. The keyboard stays available.");}
+  else if(ip==="typing"){cfg.input_style="text";R("R04","Typing was the selected input preference, so a text-emphasis trial is proposed (keyboard first, word prediction on), with the symbol boards one tap away. No reading score is needed.");}
+  else if(ip==="mix"){cfg.input_style="mixed";R("R05","A mix was selected, so symbols and the keyboard are offered together.");}
+  else {cfg.input_style="symbols";cfg.input_unconfirmed=true;R("R05","The input style is still being explored, so both choices are shown. The symbol-and-text preview is labelled unconfirmed — switch any time with the ⌨️ ABC button.");}
+  // R06 — access methods
+  const am=(val(a,"access_methods")||[]).filter(x=>!["notsure","skip","other"].includes(x));
+  const touchOK=am.includes("finger")||am.includes("hand_stylus");
+  cfg.access_method="touch"; cfg.scan=false;
+  if(am.includes("switch")){
+    if(p.switch_test==="passed"){cfg.scan=true;cfg.access_method="switch";cfg.checks.switch="passed";R("R06","Switch scanning was reported and a switch press was detected on this device, so scanning is set up.");}
+    else {cfg.checks.switch=p.switch_test||"pending";cfg.reviews.add("access method");R("R06","Switch scanning was reported but hasn't been checked on this device yet, so it is not turned on. Run the switch check in the preview; current methods stay available.");}
+  }
+  if(am.includes("eye_gaze")){cfg.checks.eye_gaze="not supported";cfg.reviews.add("access method");R("R06","Eye gaze was reported. TalkBoard has no built-in eye tracking, so it is not enabled; an access review is suggested. Eye gaze and switches are never substituted automatically.");}
+  if(am.includes("pointer")){cfg.checks.pointer="supported";if(!touchOK&&cfg.access_method==="touch")cfg.access_method="pointer";R("R06","Mouse, trackball or head pointer works with TalkBoard's buttons as they are.");}
+  if(am.includes("keyboard")){cfg.checks.keyboard="supported";R("R06","A physical keyboard can type in the ABC view and can drive scanning (Space/Enter).");}
+  if(am.includes("partner")){R("R06","Partner-assisted pointing or scanning is kept: a partner can point to or read out choices on the board or a printed board.");}
+  if(am.includes("exploring")||!am.length){cfg.reviews.add("access method");R("R06","Access is still being explored (or unknown), so a supported touch preview is offered — no switch or eye-gaze setup is prescribed.");}
+  // R07 — touch concerns
+  const te=val(a,"touch_experience")||[];
+  const tc=te.filter(x=>["neighbors","repeated","hard_areas","fatigue"].includes(x));
+  if(tc.length){ R("R07",`Touch notes (${tc.length}) were reported, so spacing, size, position and activation previews were offered. ${p.hold||p.deb?"The activation settings chosen in the preview are applied.":"No activation change was chosen, so none is applied."}`);
+    if(te.includes("hard_areas")||te.includes("fatigue")) cfg.reviews.add("positioning"); }
+  if((val(a,"access_supports")||[]).some(x=>["mount","seating"].includes(x))&&tc.length) cfg.reviews.add("positioning");
+  // layout — from the device preview only
+  cfg.layout=p.layout||24; cfg.layout_confirmed=!!(p.tried&&["comfortable","some_difficulty"].includes(p.comfort));
+  R("Layout",cfg.layout_confirmed?`${cfg.layout==="all"?"All buttons on one screen":cfg.layout+" buttons per page"} was chosen during the preview on this device. Learned button locations are kept.`:`${cfg.layout==="all"?"All buttons":cfg.layout+" buttons per page"} is saved as unconfirmed because ${p.tried?"access comfort wasn't clear":"no preview has happened yet"}. Try it on the device and adjust.`);
+  if(p.comfort==="hard") cfg.reviews.add("access method");
+  // R08 — visual
+  const vp=val(a,"visual_preferences")||[];
+  cfg.gap=p.gap; cfg.symScale=p.symScale; cfg.theme=p.theme;
+  if(vp.some(x=>["larger","spacing","plain_contrast"].includes(x))) R("R08",`Display preferences were previewed; applied: spacing ${p.gap}px, symbol size ${Math.round(p.symScale*100)}%, ${({light:"light",dark:"dark plain",contrast:"high contrast"})[p.theme]} background.`);
+  if(vp.includes("spoken_desc")) R("R08","Spoken descriptions: buttons can say their label when touched (see feedback).");
+  if(vp.includes("specialist_plan")){cfg.reviews.add("visual access");R("R08","An existing specialist display plan was reported — keep following it and review TalkBoard's display against it. No generic preset is imposed.");}
+  if(vp.includes("difficult")||isUnknown(a,"visual_preferences")&&a.visual_preferences&&a.visual_preferences.status==="unknown") cfg.reviews.add("visual access");
+  if(vp.includes("current_ok")&&vp.some(x=>["larger","spacing","plain_contrast"].includes(x))) cfg.conflicts.push(["Q09","“Current display works comfortably” and a display change were both chosen. Which should be tried first? (The preview settings are used until you decide.)"]);
+  // R09 — audio & feedback
+  const ap=val(a,"audio_preferences")||[], sp=val(a,"sensory_preferences")||[];
+  cfg.speakEach=ap.includes("spoken_labels")||sp.includes("spoken_labels")||vp.includes("spoken_desc");
+  cfg.calm=sp.includes("minimal_motion")||ap.includes("quiet_display");
+  cfg.highlight=sp.includes("clear_highlight");
+  cfg.vibrate=sp.includes("vibration");
+  cfg.volume=state.settings.volume||1;
+  R("R09",`Calm interface by default. ${cfg.speakEach?"Spoken button labels are on (chosen).":"Spoken button labels are off — the message is spoken with Speak."} ${cfg.calm?"Minimal motion is on.":""} ${cfg.highlight?"Clear highlighting is on.":""} Volume and speed can be set in Settings; text and symbols always show with speech.`);
+  if(cfg.vibrate){ cfg.checks.vibration=("vibrate" in navigator)?"supported":"not supported"; if(cfg.checks.vibration==="not supported") R("R09","Vibration was requested but this device/browser doesn't support it, so it can't be enabled here."); }
+  if(ap.includes("output_hard")){cfg.reviews.add("audio access");R("R09","Hearing or understanding speech output is difficult — an audio access review is suggested. All words stay available as text and symbols.");}
+  if(ap.includes("headphones")) cfg.guidance.push("Headphones: plug in when appropriate; TalkBoard uses the device's normal audio output.");
+  // R10 — languages & voices
+  const L=reqLangs(a), vc=(a.voice_choice&&typeof a.voice_choice.v==="object"&&a.voice_choice.v)||{};
+  cfg.languages=L.length?L:[]; cfg.voices={}; cfg.rate=state.settings.rate;
+  (L.length?L:[curLang()]).forEach(l=>{
+    const c=vc[l]||{}, avail=voices.filter(v=>baseLang(v.lang)===l);
+    if(!VOCAB_LANGS.includes(l)){cfg.reviews.add("language support");cfg.checks["vocabulary_"+l]="not available";}
+    if(!avail.length){cfg.reviews.add("language support");cfg.checks["voice_"+l]="not installed";}
+    else { cfg.checks["voice_"+l]="available"; if(c.mode==="use"&&c.voice&&avail.some(v=>v.voiceURI===c.voice)) cfg.voices[l]=c.voice; if(c.rate) cfg.rate=+c.rate; }
+    cfg.checks["offline_speech_"+l]=(state.profile&&state.profile.checks&&state.profile.checks["offline_speech_"+l]==="verified")?"verified":"pending";
+  });
+  if(L.length){ const miss=L.filter(l=>!VOCAB_LANGS.includes(l)); R("R10",`Requested: ${L.map(langName).join(", ")}. ${miss.length?`TalkBoard doesn't have ${miss.map(langName).join(", ")} vocabulary yet — kept in the profile and flagged for review; English labels are not presented as ${miss.map(langName).join("/")}. `:""}Voices are set only where installed; offline speech is marked pending until tested with the internet off.`); }
+  // R11 — personal vocabulary & priorities
+  const pv=(a.personal_vocabulary&&typeof a.personal_vocabulary.v==="object"&&a.personal_vocabulary.v)||{}, pr=val(a,"communication_priorities")||[];
+  cfg.additions={people:pv.people||[],interests:pv.interests||[],places:pv.places||[],routines:pv.routines||[],words:pv.words||[]};
+  const nAdd=Object.values(cfg.additions).reduce((s,x)=>s+x.length,0);
+  if(nAdd) R("R11",`${nAdd} personal words are added in a “My Words” folder (people also go in People), alongside the full vocabulary. Words for refusing, questions, conversation and feelings stay in place.`);
+  if(pr.length) R("R11","Priorities shape the examples and partner guidance below; they don't hide any words.");
+  // R12 — settings, connectivity, partners
+  const us=val(a,"use_settings")||[], cn=val(a,"connectivity"), cp=val(a,"communication_partners")||[];
+  if(["sometimes","rarely"].includes(cn)) R("R12","Internet is limited, so the setup leans on local storage: keep a backup copy and a printed board for when the device isn't available.");
+  else R("R12","Everything is stored on the device, so communication keeps working without internet. Keep a backup and a printed board as well.");
+  const routineIdeas={home:"mealtimes, bath and bedtime",school:"morning circle, snack and lessons",therapy:"session warm-up and choosing activities",community:"shopping and ordering food",travel:"car rides and new places"};
+  const ri=us.filter(x=>routineIdeas[x]).map(x=>routineIdeas[x]); if(ri.length) cfg.guidance.push(`Routines to try it in: ${ri.join("; ")}.`);
+  const pg={request:"requests",refuse:"refusals (“stop”, “not”, “different”)",questions:"questions",joke_comment:"comments and jokes",feelings:"feelings",help_break:"asking for help or a break",share_stories:"telling what happened",learning:"answering and asking in lessons"};
+  const focus=pr.map(x=>pg[x]).filter(Boolean);
+  cfg.guidance.push(`Model your own messages on the device during familiar routines — ${focus.length?focus.join(", "):"comments, questions, requests and refusals"} — then pause and wait. Don't require the child to copy or prove anything.`);
+  if(cp.includes("slp")||cp.includes("at_specialist")) cfg.guidance.push("Share the reasons and suggested reviews with the SLP or AT specialist when you choose to (Settings → Copy backup). Nothing is sent automatically.");
+  if(cp.includes("teacher")) cfg.guidance.push("For school: print a board for times the device isn't available, and keep the same layout across settings.");
+  if(cp.includes("none_arranged")||!cp.length) cfg.guidance.push("No support person is needed to start. Settings → Child profile has the reasons and a follow-up review you can do yourselves.");
+  const guided=(a.communication_partners&&a.communication_partners.follow||{}).guided; if(guided==="yes") cfg.guided=true;
+  // R13 — child's response
+  const cr=val(a,"child_response");
+  cfg.child_response=cr||"unclear";
+  // R14 — unknowns
+  IQ.filter(q=>q.f&&q.id.startsWith("Q")).forEach(q=>{ if(isUnknown(a,q.f)&&!["voice_choice","personal_vocabulary","child_response"].includes(q.f)) cfg.unknowns.push(q.id+" "+(a[q.f]&&a[q.f].reason?"(not applicable — touch not used)":a[q.f]&&a[q.f].status==="unknown"?"(not sure)":"(skipped)")); });
+  if(ip==="typing"&&(val(a,"literacy_experience")||[]).includes("not_yet")) R("R14","Typing was chosen and letters haven't been explored yet — that's fine. Typing stays available; no literacy gate is applied.");
+  if(override) Object.assign(cfg,override);
+  cfg.reviews=[...cfg.reviews];
+  return cfg;
+}
+function cfgRows(c){
+  const nAdd=Object.values(c.additions||{}).reduce((s,x)=>s+x.length,0);
+  const am={touch:"Touch",pointer:"Mouse / pointer",switch:"Switch scanning"}[c.access_method];
+  const sup=(iw.prev&&iw.prev.supports||[]).map(s=>IQ.find(q=>q.id==="Q08").o.find(o=>o[0]===s)[2].toLowerCase());
+  return [
+   ["Message input",{symbols:"Pictures with words, with keyboard access always available.",text:"Typing first (keyboard with word prediction), symbol boards one tap away.",mixed:"Pictures and keyboard together."}[c.input_style]+(c.input_unconfirmed?" (unconfirmed)":"")],
+   ["Physical access",`${am}${sup.length?` with ${sup.join(", ")}`:""}.${c.scan?" Scanning on.":""}${c.checks.eye_gaze?" Eye gaze: not available in TalkBoard.":""}${(iw.prev||{}).hold?` Hold to select ${(iw.prev).hold} ms.`:""}${(iw.prev||{}).deb?` Repeat taps ignored for ${(iw.prev).deb} ms.`:""}`],
+   ["Layout",`${c.layout==="all"?"All buttons on one screen":c.layout+" buttons per page"} — ${c.layout_confirmed?"chosen in a comfortable preview on this device":"unconfirmed"}. Button locations are kept.`],
+   ["Appearance",`Spacing ${c.gap}px · symbols ${Math.round(c.symScale*100)}% · ${({light:"light",dark:"dark plain",contrast:"high contrast"})[c.theme]} background${c.calm?" · minimal motion":""}${c.highlight?" · clear highlighting":""}.`],
+   ["Language and voice",`${c.languages.length?c.languages.map(langName).join(", "):"Device language ("+langName(curLang())+")"}; ${Object.keys(c.voices).length?"chosen voices":"best-match voice"}. Offline speech test ${Object.entries(c.checks).filter(([k])=>k.startsWith("offline_speech")).every(([,v])=>v==="verified")?"done":"still pending"}.`],
+   ["Feedback",`${c.speakEach?"Buttons say their label":"Message is spoken with Speak"}${c.vibrate?(c.checks.vibration==="supported"?" · light vibration":" · vibration not supported here"):""}.`],
+   ["Personal words",nAdd?Object.entries(c.additions).filter(([,v])=>v.length).map(([k,v])=>`${k}: ${v.join(", ")}`).join(" · ")+" — alongside broad vocabulary.":"None added yet (add any time in Edit mode)."],
+   ["Partner support",c.guidance.join(" ")],
+  ];
+}
+function resultHTML2(){
+  const c=iw.cfg=iw.cfg||buildConfig(), cr=c.child_response;
+  const pending=Object.entries(c.checks).filter(([,v])=>["pending","not installed","not available","not supported","failed"].includes(v));
+  let h=`<table class="rtab">${cfgRows(c).map(([k,v])=>`<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}
+   <tr><th>Status</th><td>${cr==="try"?"Ready to select as a trial":"Draft"}. Technical checks: ${pending.length?pending.map(([k,v])=>`${checkName(k)}: ${v}`).join("; "):"none pending"}. Suggested reviews: ${c.reviews.length?c.reviews.join(", "):"none identified by current answers"}.</td></tr></table>`;
+  if(cr==="change") h=`<div class="recbox"><h3>🔧 ${esc(nickName())} would like something changed</h3><p>What should change?</p><div class="chips">${[["Q12","Voice"],["PREVIEW","Appearance"],["PREVIEW","Layout"],["Q06","Access method"],["Q16","Vocabulary"],["ADJUST","Other settings"]].map(([s,l])=>`<button class="chipb" data-act="goto" data-arg="${s}">${l}</button>`).join("")}</div></div>`+h;
+  if(cr==="another") h=`<div class="recbox"><h3>🔀 ${esc(nickName())} would like another option</h3><button class="b primary" data-act="compare">Compare another option</button></div>`+h;
+  if(cr==="not_now"||cr==="unclear") h=`<div class="recbox"><h3>⏸️ ${cr==="not_now"?`${esc(nickName())} said not now`:"No clear preference observed yet"}</h3><p>That's respected — a silent or unclear response isn't approval. Save this as a draft and try again another time. Existing communication methods stay available.</p></div>`+h;
+  if(c.conflicts.length) h+=`<div class="recbox"><h3>Please check</h3><ul>${c.conflicts.map(([q,t])=>`<li>${esc(t)} <button class="chipb" data-act="goto" data-arg="${q}">Review ${q}</button></li>`).join("")}</ul></div>`;
+  if(c.unknowns.length) h+=`<div class="recbox"><h3>Kept as unknown</h3><p class="hint">${esc(c.unknowns.join(" · "))}. Nothing was assumed from these; the setup uses reversible defaults you can change any time.</p></div>`;
+  h+=`<div class="recbox"><h3>Why we suggested this</h3><ul>${c.reasons.map(([id,t])=>`<li><b>${id}</b> ${esc(t)}</li>`).join("")}</ul></div>
+  <div class="btns" style="justify-content:flex-start">
+   <button class="b primary" data-act="try" ${cr==="try"?"":"title='The child has not chosen to try yet'"}>✅ Try this setup${cr==="try"?"":" (adult decision)"}</button>
+   <button class="b" data-act="adjust">⚙️ Adjust settings</button>
+   <button class="b" data-act="compare">🔀 Compare another option</button>
+   <button class="b" data-act="later">💾 Save for later</button></div>
+  <p class="hint">Proposed product rules (${RV}); to be validated with AAC users and AAC-experienced professionals. Not a clinical assessment. Sharing for review happens only if you choose to share a backup.</p>`;
+  return h;
+}
+function adjustHTML(){
+  const c=iw.cfg=iw.cfg||buildConfig();
+  const o=(v,cur,l)=>`<option value="${v}" ${String(v)===String(cur)?"selected":""}>${l}</option>`;
+  return `<div id="adjForm">
+  <div class="row"><label>Message input</label><select id="adInput">${o("symbols",c.input_style,"Pictures with words")}${o("text",c.input_style,"Typing first")}${o("mixed",c.input_style,"Mix of both")}</select></div>
+  <div class="row"><label>Buttons per page</label><select id="adLayout">${o("all",c.layout,"Show all")}${TPL_KEYS.map(n=>o(n,c.layout,n)).join("")}</select></div>
+  <div class="row"><label>Space between buttons</label><input type="range" id="adGap" min="2" max="30" value="${c.gap}"></div>
+  <div class="row"><label>Symbol size</label><input type="range" id="adSym" min="0.6" max="1.4" step="0.05" value="${c.symScale}"></div>
+  <div class="row"><label>Background</label><select id="adTheme">${o("light",c.theme,"Light")}${o("dark",c.theme,"Dark, plain")}${o("contrast",c.theme,"High contrast")}</select></div>
+  <div class="row"><label><input type="checkbox" id="adSpeak" ${c.speakEach?"checked":""}> Buttons say their label</label></div>
+  <div class="row"><label><input type="checkbox" id="adCalm" ${c.calm?"checked":""}> Minimal motion</label></div>
+  <div class="row"><label><input type="checkbox" id="adHi" ${c.highlight?"checked":""}> Clear highlighting</label></div>
+  <div class="row"><label><input type="checkbox" id="adScan" ${c.scan?"checked":""} ${c.checks.switch==="passed"?"":"disabled"}> Switch scanning ${c.checks.switch==="passed"?"":"(run the switch check in the preview first)"}</label></div>
+  <div class="row"><label><input type="checkbox" id="adProtect" ${state.settings.protect?"checked":""}> Communication-only mode (hide Edit)</label></div>
+  <h3>Vocabulary</h3>
+  <div class="row"><label><input type="radio" name="adVoc" value="add" ${c.vocab_action!=="replace"?"checked":""}> Keep current boards and add personal words (button locations kept)</label></div>
+  <div class="row"><label><input type="radio" name="adVoc" value="replace" ${c.vocab_action==="replace"?"checked":""}> Start again from the TalkBoard starter vocabulary + personal words</label></div>
+  <p class="hint">Starting again changes button locations the child may have learned — choose it only on purpose.</p></div>`;
+}
+function readAdjust(){
+  const c=iw.cfg; if(!c||!$("adInput")) return;
+  c.input_style=$("adInput").value; c.input_unconfirmed=false; const L=$("adLayout").value; c.layout=L==="all"?"all":+L;
+  c.gap=+$("adGap").value; c.symScale=+$("adSym").value; c.theme=$("adTheme").value; c.speakEach=$("adSpeak").checked; c.calm=$("adCalm").checked; c.highlight=$("adHi").checked;
+  c.scan=$("adScan").checked; c.protect=$("adProtect").checked; c.vocab_action=document.querySelector("input[name=adVoc]:checked").value; c.adjusted=true;
+}
+function altConfig(c){
+  const i=LAYOUT_OPTS.indexOf(+c.layout), L=LAYOUT_OPTS[(i+1)%LAYOUT_OPTS.length]||24;
+  const inp=c.input_style==="symbols"?"mixed":"symbols";
+  return {...c,layout:L,layout_confirmed:false,input_style:inp,input_unconfirmed:true,reasons:[...c.reasons,["Compare",`Alternative: ${L} buttons per page and ${inp==="mixed"?"pictures with the keyboard together":"pictures with words"} (unconfirmed until tried).`]]};
+}
+function compareHTML(){
+  const c=iw.cfg=iw.cfg||buildConfig(), alt=iw.alt=iw.alt||altConfig(c);
+  const A=cfgRows(c), B=cfgRows(alt);
+  return `<p class="hint">Show both to the child and team and choose one to try. Neither is applied until you choose.</p>
+  <table class="rtab"><tr><th></th><th>Option A (suggested)</th><th>Option B</th></tr>${A.slice(0,4).map((r,i)=>`<tr><th>${r[0]}</th><td>${esc(r[1])}</td><td>${esc(B[i][1])}</td></tr>`).join("")}</table>
+  <div class="btns" style="justify-content:flex-start"><button class="b primary" data-act="pick" data-arg="A">Use option A</button><button class="b primary" data-act="pick" data-arg="B">Use option B</button><button class="b" data-act="back">◀ Back to the suggestion</button></div>`;
+}
+function resultAction(act,arg){
+  const c=iw.cfg;
+  if(act==="goto"){ iw.step=IQ.findIndex(x=>x.id===arg); renderIW(); return; }
+  if(act==="adjust"){ iw.step=IQ.findIndex(x=>x.id==="ADJUST"); renderIW(); return; }
+  if(act==="compare"){ iw.alt=null; iw.step=IQ.findIndex(x=>x.id==="COMPARE"); renderIW(); return; }
+  if(act==="back"){ iw.step=IQ.findIndex(x=>x.id==="RESULT"); renderIW(); return; }
+  if(act==="pick"){ if(arg==="B"){ iw.cfg=iw.alt; } iw.step=IQ.findIndex(x=>x.id==="RESULT"); renderIW(); toast(`Option ${arg} selected — press Try this setup to apply it`); return; }
+  if(act==="later"){ saveProfile("Draft",c); hide("oWiz"); toast("Saved as a draft. Nothing was changed."); return; }
+  if(act==="try"){ applyConfig(c); return; }
+}
+function saveProfile(status,c){
+  const prevChecks=(state.profile&&state.profile.checks)||{};
+  const checks={...(c?c.checks:{})}; Object.keys(prevChecks).forEach(k=>{ if(prevChecks[k]==="verified") checks[k]="verified"; });
+  state.profile={version:QV,rules_version:RV,saved:new Date().toISOString(),configuration_status:status,answers:iw.a,observation:iw.prev,
+    respondent:(iw.a.profile||{}).respondent||"",device_detected:detectDevice(),
+    output:c?{input_style:c.input_style,access_method:c.access_method,layout_id:c.layout,layout_confirmed:c.layout_confirmed,
+      display_preferences:{gap:c.gap,symScale:c.symScale,theme:c.theme,calm:c.calm,highlight:c.highlight},languages:c.languages,voice_ids:c.voices,
+      vocabulary_additions:c.additions,feedback_settings:{speakEach:c.speakEach,vibrate:c.vibrate&&c.checks.vibration==="supported",rate:c.rate},
+      partner_guidance:c.guidance,review_suggestions:c.reviews,recommendation_reasons:c.reasons,unknowns:c.unknowns}:null,
+    checks,reviews_followup:(state.profile&&state.profile.reviews_followup)||[]};
+  save();
+}
+function addPersonalWords(boards,add){
+  if(!Object.values(add).some(x=>x.length)) return;
+  const mw=boards.mywords=boards.mywords||{name:"My Words",buttons:[]};
+  const seen=new Set(mw.buttons.map(b=>b.label.toLowerCase()));
+  const put=(bd,b)=>{ const i=bd.buttons.findIndex(x=>x.type==="blank"); if(i>=0) bd.buttons[i]=b; else bd.buttons.push(b); }; // fill empty spaces first, never move existing buttons
+  ["interests","places","routines","words"].forEach(k=>add[k].forEach(w=>{ if(!seen.has(w.toLowerCase())){ seen.add(w.toLowerCase()); put(mw,W(w,symFor(w),k==="words"?"misc":"noun")); } }));
+  if(boards.people) add.people.forEach(p=>{ if(!boards.people.buttons.some(x=>x.label.toLowerCase()===p.toLowerCase())) put(boards.people,W(p,"🧑","noun")); });
+  else add.people.forEach(p=>{ if(!seen.has(p.toLowerCase())){seen.add(p.toLowerCase());put(mw,W(p,"🧑","noun"));} });
+  if(!boards.home.buttons.some(b=>b.type==="folder"&&b.target==="mywords")) put(boards.home,F("My Words","⭐","mywords"));
+}
+function applyConfig(c){
+  const S=state.settings;
+  if(c.vocab_action==="replace"){ state.boards=starter(); Object.keys(pageOf).forEach(k=>delete pageOf[k]); }
+  addPersonalWords(state.boards,c.additions);
+  Object.assign(S,{layout:c.layout,gap:c.gap,symScale:c.symScale,theme:c.theme,speakEach:c.speakEach,calm:c.calm,highlight:c.highlight,
+    vibrate:!!(c.vibrate&&c.checks.vibration==="supported"),scan:!!(c.scan&&c.checks.switch==="passed"),inputStyle:c.input_style,rate:c.rate||S.rate});
+  if(iw.prev){ S.hold=iw.prev.hold||0; S.deb=iw.prev.deb||0; }
+  if(c.protect!==undefined) S.protect=c.protect;
+  const L=c.languages.length?c.languages:[];
+  if(L.length){ S.lang=voices.some(v=>baseLang(v.lang)===L[0])?L[0]:S.lang; S.accent=""; }
+  S.voicePerLang={...(S.voicePerLang||{}),...c.voices}; S.voice=c.voices[curLang()]||"";
+  saveProfile("Trial selected",c);
+  path=["home"]; if(editing) toggleEdit();
+  applyLook(); hide("oWiz"); setView(c.input_style==="text"?"kbd":"board"); fillLangs();
+  if(S.scan) startScan(); else stopScan();
+  toast("Trial setup applied — change anything any time");
+}
+$("sWiz").onclick=()=>{ hide("oSet"); openWizard(); };
+
+/* ---- profile panel in Settings: status, reviews, technical checks, follow-up review ---- */
+function renderProfilePanel(){
+  const P=state.profile, el=$("sProfile"); if(!el) return;
+  if(!P||P.version!==QV){ el.innerHTML=`<p class="hint">No child profile yet.</p>`; return; }
+  const o=P.output||{}, ck=P.checks||{};
+  const langs=(o.languages&&o.languages.length?o.languages:[curLang()]);
+  el.innerHTML=`<p><b>Status:</b> ${esc(P.configuration_status)} · saved ${new Date(P.saved).toLocaleDateString()}</p>
+   <p><b>Suggested reviews:</b> ${(o.review_suggestions||[]).length?esc(o.review_suggestions.join(", ")):"none"} <span class="hint">(advisory — nothing is locked)</span></p>
+   <p><b>Technical checks:</b> ${Object.keys(ck).length?Object.entries(ck).map(([k,v])=>`${esc(checkName(k))}: <b>${esc(v)}</b>`).join(" · "):"none"}</p>
+   <div class="btns" style="justify-content:flex-start">
+    ${P.configuration_status==="Trial selected"?`<button class="b" id="spInUse">✔ Mark as In use</button>`:""}
+    ${langs.map(l=>`<button class="b" data-offl="${l}">✈️ Test offline speech (${esc(langName(l))})</button>`).join("")}
+    <button class="b" id="spReview">📝 How is it going? (follow-up review)</button></div>
+   <p class="hint" id="spMsg"></p>`;
+}
+document.addEventListener("click",e=>{
+  const t=e.target; if(!t.closest||!t.closest("#sProfile")) return;
+  const P=state.profile;
+  if(t.id==="spInUse"){ P.configuration_status="In use"; save(); renderProfilePanel(); }
+  if(t.dataset.offl){
+    const l=t.dataset.offl;
+    if(navigator.onLine){ $("spMsg").textContent="Turn off Wi-Fi and mobile data (or use airplane mode) first, then press the button again."; return; }
+    const keep={lang:state.settings.lang,accent:state.settings.accent,voice:state.settings.voice};
+    Object.assign(state.settings,{lang:l,accent:"",voice:(state.settings.voicePerLang||{})[l]||""}); say(TEST_PHRASE[l]||TEST_PHRASE.en); Object.assign(state.settings,keep);
+    ask("Did you hear the voice?","The internet is off. If you heard it clearly, offline speech is marked as tested on this device.",{okText:"Yes, I heard it"}).then(ok=>{
+      P.checks=P.checks||{}; P.checks["offline_speech_"+l]=ok?"verified":"failed"; P.checks.offline_tested_on=detectDevice()+" "+new Date().toLocaleDateString(); save(); show("oSet"); renderProfilePanel(); });
+  }
+  if(t.id==="spReview") openFollowUp();
+});
+function openFollowUp(){
+  hide("oSet");
+  $("wStepL").textContent="Follow-up review"; $("wBar").style.width="100%"; $("wBack").style.visibility="hidden"; $("wNext").style.display=""; $("wNext").textContent="Save review"; $("wSkip").textContent="Close";
+  $("wBody").innerHTML=`<h2>How is it going?</h2><p class="hint">After using the setup in real settings. Button counts alone don't measure communication, and the board is never rearranged or “levelled up” automatically.</p>
+   <div class="row"><label style="flex-basis:100%">What did ${esc((state.profile.answers.profile||{}).nickname||"the child")} want to say?</label><input type="text" id="fuSay"></div>
+   <div class="row"><label style="flex-basis:100%">Useful words that were missing (comma-separated — they'll be added to My Words)</label><input type="text" id="fuMissing"></div>
+   <div class="row"><label style="flex-basis:100%">Which choices were hard to reach or find?</label><input type="text" id="fuHard"></div>
+   <div class="row"><label style="flex-basis:100%">What would the child change?</label><input type="text" id="fuChange"></div>`;
+  show("oWiz");
+  $("wNext").onclick=()=>{
+    const r={date:new Date().toISOString(),wanted_to_say:$("fuSay").value,missing:$("fuMissing").value,hard:$("fuHard").value,change:$("fuChange").value};
+    state.profile.reviews_followup=[...(state.profile.reviews_followup||[]),r];
+    const miss=r.missing.split(",").map(s=>s.trim()).filter(Boolean);
+    if(miss.length) addPersonalWords(state.boards,{people:[],interests:[],places:[],routines:[],words:miss});
+    save(); hide("oWiz"); $("wNext").onclick=()=>iwGo(1); renderBoard(); toast(miss.length?`Review saved · ${miss.length} word(s) added to My Words`:"Review saved");
+  };
+  $("wSkip").onclick=()=>{ hide("oWiz"); $("wNext").onclick=()=>iwGo(1); $("wSkip").onclick=()=>{ saveProfile("Draft",iw.cfg||buildConfig()); hide("oWiz"); toast("Saved as a draft. Nothing was changed."); }; };
+}
+
+/* ====================== Init ====================== */
+buildKeys(); applyLook(); renderBoard(); renderMsg();
+try{ if("serviceWorker" in navigator && /^https?:/.test(location.protocol) && document.querySelector('link[rel=manifest]')) navigator.serviceWorker.register("sw.js").catch(()=>{}); }catch(e){}
+if(S.scan) startScan();
+if(S.inputStyle==="text") setView("kbd");
+if(firstRun && !state.profile) setTimeout(openWizard,300);
+</script>
+</body>
+</html>
