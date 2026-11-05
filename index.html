@@ -221,6 +221,7 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <button class="navbtn" id="nHome">🏠<span class="nt"> Home</span></button>
   <button class="navbtn" id="nBackBoard">↩<span class="nt"> Back</span></button>
   <button class="navbtn" id="nKbd">⌨️<span class="nt"> ABC</span></button>
+  <button class="navbtn" id="nTopics" style="display:none">🗂<span class="nt"> Topics</span></button>
   <button class="navbtn" id="nHist">🕘<span class="nt"> Recent</span></button>
   <div id="crumb">Home</div>
   <span id="editBadge">EDIT MODE</span>
@@ -340,6 +341,7 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <div class="row"><label>Buttons per page</label><select id="lSel"></select></div>
   <div class="tplpick" id="lPick" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin-top:10px"></div>
   <div class="row"><label><input type="checkbox" id="lFill"> Add empty spaces so the last page is full</label></div>
+  <div class="row" id="lTopicsRow"><label><input type="checkbox" id="lTopics"> Put topic folders on their own last page (“Topics”) — moves folders</label></div>
   <div class="btns"><button class="b" id="lCancel">Cancel</button><button class="b primary" id="lSave">Apply</button></div>
 </div></div>
 
@@ -656,6 +658,13 @@ function renderBoard(){
   const pg=pageOf[id]||0;
   $("pPrev").disabled=pg===0; $("pNext").disabled=pg>=pageCount-1;
   $("pPrevL").textContent=$("pNextL").textContent=paged?`${pg+1} / ${pageCount}`:"";
+  // Topics page: a Home page holding only topic folders
+  let topicsPage=-1;
+  if(id==="home"&&N){ const fi=bd.buttons.findIndex(b=>b.type==="folder"); if(fi>=0&&bd.buttons.slice(Math.floor(fi/N)*N,fi).every(b=>b.type==="blank")) topicsPage=Math.floor(fi/N); }
+  const onTopics=topicsPage>=0&&pg>=topicsPage;
+  if(onTopics){ $("crumb").textContent="Home › Topics"; $("pPrevL").textContent=$("pNextL").textContent=`Topics · ${pg+1}/${pageCount}`; }
+  $("nTopics").style.display=topicsPage>=0&&view==="board"&&!onTopics?"":"none";
+  $("nTopics").onclick=()=>{ pageOf.home=topicsPage; renderBoard(); };
   $("nBackBoard").style.display=path.length>1?"flex":"none";
   requestAnimationFrame(sizeCells);
 }
@@ -1058,6 +1067,7 @@ function renderPick(){
     <span style="font-size:.8rem">${k==="app"?"App setting":k}</span></button>`).join("");
 }
 $("nLayout").onclick=()=>{
+  $("lTopicsRow").style.display=curId()==="home"?"flex":"none"; $("lTopics").checked=false;
   const bd=curBoard();
   $("lSel").innerHTML='<option value="app">Use app setting</option><option value="all">Show all on one screen</option>'+TPL_KEYS.map(n=>`<option value="${n}">${tplName(n)} per page</option>`).join("");
   $("lSel").value=bd.layout?String(bd.layout):"app"; $("lFill").checked=false;
@@ -1070,6 +1080,7 @@ $("lSave").onclick=()=>{
   const bd=curBoard(), v=$("lSel").value;
   if(v==="app") delete bd.layout; else bd.layout=v==="all"?"all":+v;
   const N=boardLayout(bd);
+  if($("lTopics").checked && N && curId()==="home") groupTopics(bd,N);
   if($("lFill").checked && N){ while(bd.buttons.length%N!==0 || bd.buttons.length===0) bd.buttons.push({id:nid(),type:"blank",label:""}); }
   pageOf[curId()]=0; save(); hide("oLayout"); renderBoard();
   toast(N?`${tplName(N)} per page`:"Showing all buttons");
@@ -1116,7 +1127,7 @@ let scanTimer=null, scanIdx=-1, scanPaused=false;
 function scanTargets(){
   const area=view==="kbd"?[...$("pred").children,...$("keys").children]:[...grid.querySelectorAll("button.cell:not(.blank-slot)")];
   const pagers=document.body.classList.contains("paged")?[$("pPrev"),$("pNext")].filter(b=>!b.disabled):[];
-  return [...area,...pagers,$("bSpeak"),$("bBack"),$("bClear"),$("nHome"),...(path.length>1&&view==="board"?[$("nBackBoard")]:[]),$("nKbd")];
+  return [...area,...pagers,$("bSpeak"),$("bBack"),$("bClear"),$("nHome"),...(path.length>1&&view==="board"?[$("nBackBoard")]:[]),...($("nTopics").style.display!=="none"?[$("nTopics")]:[]),$("nKbd")];
 }
 function startScan(){
   stopScan(); if(!S.scan||editing)return; scanIdx=-1;
@@ -1436,6 +1447,107 @@ $("wBack").onclick=()=>iwGo(-1);
 $("wSkip").onclick=()=>{ saveProfile("Draft",iw.cfg||buildConfig()); hide("oWiz"); toast("Saved as a draft. Nothing was changed."); };
 
 const checkName=k=>{ const m=k.match(/^(voice|vocabulary|offline_speech)_(.+)$/); if(m) return `${{voice:"voice",vocabulary:"vocabulary",offline_speech:"offline speech"}[m[1]]} (${langName(m[2])})`; return k.replace(/_/g," "); };
+/* ---- Goal-driven starting vocabulary (TB-G 1.0) ----
+   Ranks candidate words from the child's goals (Q15), situations (Q03) and personal topics (Q16),
+   then fills Home page 1 with a guaranteed spread of communication functions, so the result is never
+   request-only (R11). Topic folders are grouped on their own final Home page(s). Learned layouts are
+   only rearranged when the team explicitly chooses it (R02 / layout rules). */
+const GV="TB-G-1.0";
+const FUNCS=["request","refuse","questions","comment","feelings","help_break"];
+const FUNC_NAMES={request:"requesting",refuse:"refusing / saying stop",questions:"asking & answering",comment:"commenting",feelings:"feelings",help_break:"help or a break",social:"social talk",joke_comment:"jokes & chatting",share_stories:"telling news",learning:"learning",core:"core word"};
+const WORD_TAGS={
+  "i":["core"],"you":["core"],"me":["core"],"it":["core"],"my":["core"],
+  "want":["request"],"more":["request","comment"],"go":["request","comment","share_stories"],"like":["comment","feelings","joke_comment"],
+  "not":["refuse"],"no":["refuse","questions"],"stop":["refuse","help_break"],"finished":["refuse","help_break"],"different":["refuse","comment"],
+  "help":["help_break"],"yes":["questions","social"],"what":["questions","learning"],"where":["questions"],"who":["questions"],"why":["questions","learning"],
+  "feel":["feelings"],"happy":["feelings"],"sad":["feelings"],"hurt":["feelings","help_break"],"angry":["feelings"],
+  "eat":["request"],"drink":["request"],"play":["request","joke_comment"],"good":["comment"],"look":["comment","share_stories","joke_comment"],
+  "know":["learning"],"again":["request","learning"],"i need a break":["help_break"],"i don't like it":["refuse","comment"],"that's funny!":["joke_comment","comment"],
+  "i don't know":["learning","questions"],"hello!":["social"],"my turn":["social","learning"],"wow!":["comment","joke_comment"],"yesterday":["share_stories"]
+};
+const BASE_W={"i":5,"you":5,"want":5,"not":5,"more":5,"help":5,"go":4,"like":4,"stop":4,"yes":4,"no":4,"it":3,"me":3,"finished":3,"different":3,"what":3,"feel":3,"play":3,"eat":2,"drink":2,"my":2,"look":2,"good":2};
+const GOAL_EXTRAS={help_break:["I need a break","hurt"],refuse:["different","I don't like it"],feelings:["happy","sad"],questions:["what","where","who"],
+  comment:["good","look","Wow!"],joke_comment:["That's funny!","look"],share_stories:["look","yesterday"],learning:["I don't know","know","again"],request:[],social:["Hello!","My turn"]};
+const CONTEXT_GOALS={tired:["help_break","feelings"],unfamiliar:["social","questions"],friends:["joke_comment","social"],noisy:["help_break"],routines:["request"],speech_hard:["core"],wants_another:[]};
+const FOLDER_GOALS={Feelings:["feelings"],Questions:["questions","learning"],Chat:["social","joke_comment","share_stories"],Food:["request"],Drinks:["request"],Body:["help_break","feelings"],People:["social"],Places:["share_stories"],Actions:["request","share_stories"],Describe:["comment"]};
+const CAT_ORDER=["pronoun","verb","describe","negate","question","social","noun","misc"];
+function findWord(boards,label){
+  const L=label.toLowerCase();
+  for(const id of ["home",...Object.keys(boards).filter(k=>k!=="home")]){
+    const x=(boards[id].buttons||[]).find(y=>y.type!=="folder"&&y.type!=="blank"&&y.label.toLowerCase()===L); if(x) return x;
+  }
+  return null;
+}
+/* Returns the plan: page-1 words with reasons, the rest of Home's words, the ordered topic folders. */
+function goalPlan(a,boards,N){
+  const pr=(val(a,"communication_priorities")||[]).filter(x=>FUNC_NAMES[x]||GOAL_EXTRAS[x]);
+  const goals={}; pr.forEach(g=>goals[g]=(goals[g]||0)+3);
+  (val(a,"communication_contexts")||[]).forEach(c=>(CONTEXT_GOALS[c]||[]).forEach(g=>goals[g]=(goals[g]||0)+1));
+  const pv=(a.personal_vocabulary&&typeof a.personal_vocabulary.v==="object"&&a.personal_vocabulary.v)||{};
+  const meals=(pv.routines||[]).some(r=>/breakfast|lunch|dinner|snack|meal/i.test(r)), interests=(pv.interests||[]).length>0;
+  // candidate pool: Home's words + goal extras from other boards
+  const pool=new Map();
+  boards.home.buttons.filter(b=>b.type!=="folder"&&b.type!=="blank").forEach(b=>pool.set(b.label.toLowerCase(),b));
+  Object.keys(goals).forEach(g=>(GOAL_EXTRAS[g]||[]).forEach(l=>{ if(!pool.has(l.toLowerCase())){ const w=findWord(boards,l); if(w) pool.set(l.toLowerCase(),{...w,id:nid(),_extra:true}); } }));
+  const scored=[...pool.values()].map(b=>{
+    const k=b.label.toLowerCase(), tags=WORD_TAGS[k]||[], why=[];
+    let s=BASE_W[k]||1;
+    tags.forEach(t=>{ if(goals[t]){ s+=goals[t]; why.push(FUNC_NAMES[t]); } });
+    if(tags.includes("core")&&goals.core) s+=goals.core;
+    if(meals&&["eat","drink"].includes(k)){ s+=2; why.push("daily routines"); }
+    if(interests&&k==="play"){ s+=2; why.push("favourite activities"); }
+    if(b._extra) s-=0.5; // prefer words already on Home when tied
+    return {b,k,s,tags,why};
+  }).sort((x,y)=>y.s-x.s);
+  const size=N&&N!=="all"?+N:Math.min(24,scored.length);
+  const pick=[], taken=new Set();
+  const add=(it,reason)=>{ if(!it||taken.has(it.k)) return; taken.add(it.k); if(reason&&!it.why.includes(reason)) it.why.unshift(reason); pick.push(it); };
+  // 1) guarantee a spread of functions (never request-only), most-wanted goals first
+  const fOrder=[...FUNCS].sort((x,y)=>(goals[y]||0)-(goals[x]||0));
+  fOrder.slice(0,Math.min(fOrder.length,Math.max(1,size-2))).forEach(f=>add(scored.find(it=>!taken.has(it.k)&&it.tags.includes(f)),"keeps "+FUNC_NAMES[f]+" available"));
+  // 2) fill the rest of page 1 by score
+  scored.forEach(it=>{ if(pick.length<size) add(it); });
+  const page1=pick.slice(0,size).sort((x,y)=>(CAT_ORDER.indexOf(x.b.cat)-CAT_ORDER.indexOf(y.b.cat))||(y.s-x.s));
+  const page1Set=new Set(page1.map(p=>p.k));
+  const rest=scored.filter(it=>!page1Set.has(it.k)&&!it.b._extra).map(it=>it.b); // extras that didn't make page 1 stay in their folders
+  const folders=boards.home.buttons.filter(b=>b.type==="folder").map((b,i)=>{
+    const g=FOLDER_GOALS[b.label]||[]; let s=-i*0.01; g.forEach(t=>s+=goals[t]||0);
+    if(b.target==="mywords") s+=10; if(b.label==="People"&&(pv.people||[]).length) s+=2;
+    return {b,s};
+  }).sort((x,y)=>y.s-x.s).map(x=>x.b);
+  return {version:GV,size,goals,page1:page1.map(p=>({b:p.b,score:Math.round(p.s*10)/10,why:p.why.length?p.why:["common core word"]})),rest,folders};
+}
+/* Lay Home out: page-1 words, the remaining words, then topic folders starting on a fresh page. */
+function homeFromPlan(plan,N){
+  const words=[...plan.page1.map(p=>({...p.b,_extra:undefined})),...plan.rest];
+  return withTopicsPage(words,plan.folders,N);
+}
+function withTopicsPage(words,folders,N){
+  const out=words.slice();
+  if(N&&N!=="all"){ while(out.length%N!==0) out.push({id:nid(),type:"blank",label:""}); }
+  return [...out,...folders];
+}
+/* Group existing Home folders onto their own last page(s), keeping the order of everything else. */
+function groupTopics(board,N){
+  const words=board.buttons.filter(b=>b.type!=="folder"), folders=board.buttons.filter(b=>b.type==="folder");
+  while(words.length&&words[words.length-1].type==="blank") words.pop();
+  board.buttons=withTopicsPage(words,folders,N);
+}
+function canAutoArrange(){
+  const fresh=starter().home.buttons.map(b=>b.label).join("|");
+  const cur=state.boards.home.buttons.filter(b=>b.type!=="blank").map(b=>b.label).filter(l=>l!=="My Words").join("|");
+  const used=state.history.length>0||(state.profile&&["Trial selected","In use"].includes(state.profile.configuration_status));
+  return cur===fresh&&!used;
+}
+function goalPlanHTML(c){
+  const p=c.plan; if(!p) return "";
+  const gl=Object.entries(p.goals).filter(([g])=>FUNC_NAMES[g]&&g!=="core").sort((x,y)=>y[1]-x[1]).map(([g])=>FUNC_NAMES[g]);
+  return `<div class="recbox"><h3>🎯 Goal-driven starting page</h3>
+   <p class="hint">${gl.length?`Ranked from the goals and situations you chose: <b>${esc(gl.join(", "))}</b>.`:"No goals chosen, so common core words are used."} Page 1 always keeps a word for each of requesting, refusing, asking, commenting, feelings and help — priorities add emphasis, they never hide words.</p>
+   <div class="firstwords">${p.page1.map(x=>`<span title="${esc(x.why.join("; "))}">${x.b.sym||""} ${esc(x.b.label)} <small style="font-weight:400;color:var(--muted)">· ${esc(x.why[0])}</small></span>`).join("")}</div>
+   <p class="hint">${c.arrange?`Home will start with these ${p.size} words, then the rest of the core words, then a <b>Topics</b> page with the category folders (${esc(p.folders.map(f=>f.label).join(", "))}).`:`Home already has learned positions, so nothing is moved. To arrange Home around these goals, choose it in <b>Adjust settings</b>.`}</p></div>`;
+}
+
 /* ---- the rules (R01–R14) ---- */
 const LAYOUT_OPTS=[12,24,48];
 function buildConfig(override){
@@ -1535,6 +1647,9 @@ function buildConfig(override){
   IQ.filter(q=>q.f&&q.id.startsWith("Q")).forEach(q=>{ if(isUnknown(a,q.f)&&!["voice_choice","personal_vocabulary","child_response"].includes(q.f)) cfg.unknowns.push(q.id+" "+(a[q.f]&&a[q.f].reason?"(not applicable — touch not used)":a[q.f]&&a[q.f].status==="unknown"?"(not sure)":"(skipped)")); });
   if(ip==="typing"&&(val(a,"literacy_experience")||[]).includes("not_yet")) R("R14","Typing was chosen and letters haven't been explored yet — that's fine. Typing stays available; no literacy gate is applied.");
   if(override) Object.assign(cfg,override);
+  // Goal-driven start (TB-G)
+  cfg.plan=goalPlan(a,state.boards,cfg.layout); cfg.arrange=canAutoArrange(); cfg.groupTopics=cfg.arrange;
+  R("Goals",cfg.arrange?`Home page 1 is filled from the child's goals and situations (${GV}), with a guaranteed word for each communication function; topic folders move to their own Topics page.`:"Home already has learned button positions, so the goal ranking is shown but nothing is moved unless you choose it in Adjust settings.");
   cfg.reviews=[...cfg.reviews];
   return cfg;
 }
@@ -1563,6 +1678,7 @@ function resultHTML2(){
   if(cr==="not_now"||cr==="unclear") h=`<div class="recbox"><h3>⏸️ ${cr==="not_now"?`${esc(nickName())} said not now`:"No clear preference observed yet"}</h3><p>That's respected — a silent or unclear response isn't approval. Save this as a draft and try again another time. Existing communication methods stay available.</p></div>`+h;
   if(c.conflicts.length) h+=`<div class="recbox"><h3>Please check</h3><ul>${c.conflicts.map(([q,t])=>`<li>${esc(t)} <button class="chipb" data-act="goto" data-arg="${q}">Review ${q}</button></li>`).join("")}</ul></div>`;
   if(c.unknowns.length) h+=`<div class="recbox"><h3>Kept as unknown</h3><p class="hint">${esc(c.unknowns.join(" · "))}. Nothing was assumed from these; the setup uses reversible defaults you can change any time.</p></div>`;
+  h+=goalPlanHTML(c);
   h+=`<div class="recbox"><h3>Why we suggested this</h3><ul>${c.reasons.map(([id,t])=>`<li><b>${id}</b> ${esc(t)}</li>`).join("")}</ul></div>
   <div class="btns" style="justify-content:flex-start">
    <button class="b primary" data-act="try" ${cr==="try"?"":"title='The child has not chosen to try yet'"}>✅ Try this setup${cr==="try"?"":" (adult decision)"}</button>
@@ -1586,6 +1702,10 @@ function adjustHTML(){
   <div class="row"><label><input type="checkbox" id="adHi" ${c.highlight?"checked":""}> Clear highlighting</label></div>
   <div class="row"><label><input type="checkbox" id="adScan" ${c.scan?"checked":""} ${c.checks.switch==="passed"?"":"disabled"}> Switch scanning ${c.checks.switch==="passed"?"":"(run the switch check in the preview first)"}</label></div>
   <div class="row"><label><input type="checkbox" id="adProtect" ${state.settings.protect?"checked":""}> Communication-only mode (hide Edit)</label></div>
+  <h3>Home arrangement</h3>
+  <div class="row"><label><input type="checkbox" id="adArrange" ${c.arrange?"checked":""}> Arrange Home around the child's goals (page 1 from the goal ranking)</label></div>
+  <div class="row"><label><input type="checkbox" id="adTopics" ${c.groupTopics||c.arrange?"checked":""}> Put topic folders on their own last Home page (“Topics”)</label></div>
+  <p class="hint">${canAutoArrange()?"Home is still the starter layout, so arranging it is safe.":"⚠️ These move buttons the child may have learned. Choose them only on purpose."}</p>
   <h3>Vocabulary</h3>
   <div class="row"><label><input type="radio" name="adVoc" value="add" ${c.vocab_action!=="replace"?"checked":""}> Keep current boards and add personal words (button locations kept)</label></div>
   <div class="row"><label><input type="radio" name="adVoc" value="replace" ${c.vocab_action==="replace"?"checked":""}> Start again from the TalkBoard starter vocabulary + personal words</label></div>
@@ -1595,7 +1715,9 @@ function readAdjust(){
   const c=iw.cfg; if(!c||!$("adInput")) return;
   c.input_style=$("adInput").value; c.input_unconfirmed=false; const L=$("adLayout").value; c.layout=L==="all"?"all":+L;
   c.gap=+$("adGap").value; c.symScale=+$("adSym").value; c.theme=$("adTheme").value; c.speakEach=$("adSpeak").checked; c.calm=$("adCalm").checked; c.highlight=$("adHi").checked;
+  c.arrange=$("adArrange").checked; c.groupTopics=$("adTopics").checked||c.arrange;
   c.scan=$("adScan").checked; c.protect=$("adProtect").checked; c.vocab_action=document.querySelector("input[name=adVoc]:checked").value; c.adjusted=true;
+  c.plan=goalPlan(iw.a,c.vocab_action==="replace"?starter():state.boards,c.layout);
 }
 function altConfig(c){
   const i=LAYOUT_OPTS.indexOf(+c.layout), L=LAYOUT_OPTS[(i+1)%LAYOUT_OPTS.length]||24;
@@ -1626,7 +1748,8 @@ function saveProfile(status,c){
     respondent:(iw.a.profile||{}).respondent||"",device_detected:detectDevice(),
     output:c?{input_style:c.input_style,access_method:c.access_method,layout_id:c.layout,layout_confirmed:c.layout_confirmed,
       display_preferences:{gap:c.gap,symScale:c.symScale,theme:c.theme,calm:c.calm,highlight:c.highlight},languages:c.languages,voice_ids:c.voices,
-      vocabulary_additions:c.additions,feedback_settings:{speakEach:c.speakEach,vibrate:c.vibrate&&c.checks.vibration==="supported",rate:c.rate},
+      vocabulary_additions:c.additions,
+      goal_plan:c.plan?{version:GV,goals:c.plan.goals,page1:c.plan.page1.map(x=>({label:x.b.label,score:x.score,why:x.why})),applied:!!c.arrange,topics_page:!!(c.groupTopics||c.arrange)}:null,feedback_settings:{speakEach:c.speakEach,vibrate:c.vibrate&&c.checks.vibration==="supported",rate:c.rate},
       partner_guidance:c.guidance,review_suggestions:c.reviews,recommendation_reasons:c.reasons,unknowns:c.unknowns}:null,
     checks,reviews_followup:(state.profile&&state.profile.reviews_followup)||[]};
   save();
@@ -1639,12 +1762,15 @@ function addPersonalWords(boards,add){
   ["interests","places","routines","words"].forEach(k=>add[k].forEach(w=>{ if(!seen.has(w.toLowerCase())){ seen.add(w.toLowerCase()); put(mw,W(w,symFor(w),k==="words"?"misc":"noun")); } }));
   if(boards.people) add.people.forEach(p=>{ if(!boards.people.buttons.some(x=>x.label.toLowerCase()===p.toLowerCase())) put(boards.people,W(p,"🧑","noun")); });
   else add.people.forEach(p=>{ if(!seen.has(p.toLowerCase())){seen.add(p.toLowerCase());put(mw,W(p,"🧑","noun"));} });
-  if(!boards.home.buttons.some(b=>b.type==="folder"&&b.target==="mywords")) put(boards.home,F("My Words","⭐","mywords"));
+  if(!boards.home.buttons.some(b=>b.type==="folder"&&b.target==="mywords")) boards.home.buttons.push(F("My Words","⭐","mywords"));
 }
 function applyConfig(c){
   const S=state.settings;
   if(c.vocab_action==="replace"){ state.boards=starter(); Object.keys(pageOf).forEach(k=>delete pageOf[k]); }
   addPersonalWords(state.boards,c.additions);
+  if(c.arrange){ const plan=goalPlan(iw.a,state.boards,c.layout); state.boards.home.buttons=homeFromPlan(plan,c.layout); c.plan=plan; }
+  else if(c.groupTopics) groupTopics(state.boards.home,c.layout);
+  Object.keys(pageOf).forEach(k=>delete pageOf[k]);
   Object.assign(S,{layout:c.layout,gap:c.gap,symScale:c.symScale,theme:c.theme,speakEach:c.speakEach,calm:c.calm,highlight:c.highlight,
     vibrate:!!(c.vibrate&&c.checks.vibration==="supported"),scan:!!(c.scan&&c.checks.switch==="passed"),inputStyle:c.input_style,rate:c.rate||S.rate});
   if(iw.prev){ S.hold=iw.prev.hold||0; S.deb=iw.prev.deb||0; }
