@@ -221,7 +221,6 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <button class="navbtn" id="nHome">🏠<span class="nt"> Home</span></button>
   <button class="navbtn" id="nBackBoard">↩<span class="nt"> Back</span></button>
   <button class="navbtn" id="nKbd">⌨️<span class="nt"> ABC</span></button>
-  <button class="navbtn" id="nTopics" style="display:none">🗂<span class="nt"> Topics</span></button>
   <button class="navbtn" id="nHist">🕘<span class="nt"> Recent</span></button>
   <div id="crumb">Home</div>
   <span id="editBadge">EDIT MODE</span>
@@ -387,15 +386,27 @@ const W=(label,sym,cat,speak)=>({id:nid(),type:"word",label,sym,cat:cat||"misc",
 const F=(label,sym,target)=>({id:nid(),type:"folder",label,sym,cat:"folder",target});
 const Q=(label,sym,speak)=>({id:nid(),type:"speak",label,sym,cat:"social",speak:speak||label});
 
+function daysBoard(){return {name:"Days of the Week",buttons:[
+  W("Monday","1️⃣","noun"),W("Tuesday","2️⃣","noun"),W("Wednesday","3️⃣","noun"),W("Thursday","4️⃣","noun"),W("Friday","5️⃣","noun"),W("Saturday","6️⃣","noun"),
+  W("Sunday","7️⃣","noun"),W("today","📍","noun"),W("tomorrow","➡️","noun"),W("yesterday","⬅️","noun"),W("weekend","🎉","noun"),W("week","📆","noun"),
+  W("morning","🌅","noun"),W("afternoon","☀️","noun"),W("night","🌙","noun"),Q("What day is it?","❓"),Q("Today is…","📍","Today is"),Q("Is it the weekend?","🎉")]};}
+function monthsBoard(){return {name:"Months of the Year",buttons:[
+  W("January","❄️","noun"),W("February","💝","noun"),W("March","🍀","noun"),W("April","🌧️","noun"),W("May","🌷","noun"),W("June","☀️","noun"),
+  W("July","🎆","noun"),W("August","🏖️","noun"),W("September","🍎","noun"),W("October","🎃","noun"),W("November","🍂","noun"),W("December","🎄","noun"),
+  W("month","🗓️","noun"),W("year","📅","noun"),W("birthday","🎂","noun"),W("holiday","🎁","noun"),Q("What month is it?","❓"),Q("My birthday is in…","🎂","My birthday is in")]};}
 function starter(){
   const b={};
-  b.home={name:"Home",buttons:[
+  b.core={name:"Core Words",buttons:[
     W("I","🙋","pronoun"),W("you","👉","pronoun"),W("want","🤲","verb"),W("go","🚶","verb"),W("like","👍","verb"),W("not","🚫","negate"),
     W("it","📦","pronoun"),W("help","🆘","verb"),W("more","➕","describe"),W("stop","✋","verb"),W("finished","🏁","describe"),W("yes","✅","social"),
-    W("me","🧍","pronoun"),W("eat","🍽️","verb"),W("drink","🥤","verb"),W("play","🧸","verb"),W("feel","💭","verb"),W("no","❌","social"),
-    F("People","👨‍👩‍👧","people"),F("Feelings","😊","feelings"),F("Food","🍎","food"),F("Drinks","🧃","drinks"),F("Places","🏫","places"),F("Questions","❓","questions"),
-    F("Actions","🏃","actions"),F("Describe","🎨","describe"),F("Body","🫀","body"),F("Things","🧩","things"),F("Chat","💬","chat"),F("Numbers","🔢","numbers")
+    W("me","🧍","pronoun"),W("eat","🍽️","verb"),W("drink","🥤","verb"),W("play","🧸","verb"),W("feel","💭","verb"),W("no","❌","social")
   ]};
+  b.home={name:"Home",buttons:[
+    F("Core Words","🗣️","core"),F("People","👨‍👩‍👧","people"),F("Feelings","😊","feelings"),F("Food","🍎","food"),F("Drinks","🧃","drinks"),F("Places","🏫","places"),F("Questions","❓","questions"),
+    F("Actions","🏃","actions"),F("Describe","🎨","describe"),F("Body","🫀","body"),F("Things","🧩","things"),F("Chat","💬","chat"),F("Numbers","🔢","numbers"),
+    F("Days of the Week","📅","days"),F("Months of the Year","🗓️","months")
+  ]};
+  b.days=daysBoard(); b.months=monthsBoard();
   b.people={name:"People",buttons:[
     W("I","🙋","pronoun"),W("you","👉","pronoun"),W("he","👦","pronoun"),W("she","👧","pronoun"),W("we","👫","pronoun"),W("they","👥","pronoun"),
     W("mom","👩","noun"),W("dad","👨","noun"),W("brother","🧒","noun"),W("sister","👧","noun"),W("grandma","👵","noun"),W("grandpa","👴","noun"),
@@ -486,6 +497,21 @@ let state=store.get(KEY);
 if(!state||!state.boards||!state.boards.home){state={boards:starter(),settings:{...DEFAULT_SETTINGS},history:[]};}
 state.settings={...DEFAULT_SETTINGS,...state.settings};
 state.history=state.history||[];
+function migrateVocab(){
+  const B=state.boards; let changed=false;
+  if(!B.core){ // older layout: words lived on Home
+    const words=B.home.buttons.filter(b=>b.type!=="folder"&&b.type!=="blank");
+    B.core={name:"Core Words",buttons:words};
+    B.home.buttons=[F("Core Words","🗣️","core"),...B.home.buttons.filter(b=>b.type==="folder")];
+    if(B.home.layout){ B.core.layout=B.home.layout; }
+    changed=true;
+  }
+  if(!B.days){ B.days=daysBoard(); changed=true; }
+  if(!B.months){ B.months=monthsBoard(); changed=true; }
+  [["days","Days of the Week","📅"],["months","Months of the Year","🗓️"]].forEach(([t,n,e])=>{ if(!B.home.buttons.some(b=>b.target===t)){ B.home.buttons.push(F(n,e,t)); changed=true; } });
+  if(changed) store.set(KEY,state);
+}
+migrateVocab();
 let warnedFull=false;
 const save=()=>{ if(!store.set(KEY,state) && !warnedFull){warnedFull=true;toast("Device storage is full or blocked: copy a backup in Settings");} };
 
@@ -632,7 +658,7 @@ function cellInner(it){
 function renderBoard(){
   const S=state.settings, bd=curBoard(), id=curId();
   $("crumb").textContent=innerWidth<640?bd.name:path.map(p=>(state.boards[p]||{}).name||p).join(" › ");
-  if(id==="home"&&!drag) ensureHomeTopics();
+  if(id==="home"&&!drag) ensureHomeTopicsOnly();
   const N=boardLayout(bd);
   let items=bd.buttons.map((b,i)=>({b,idx:i}));
   let slice;
@@ -658,13 +684,6 @@ function renderBoard(){
   const pg=pageOf[id]||0;
   $("pPrev").disabled=pg===0; $("pNext").disabled=pg>=pageCount-1;
   $("pPrevL").textContent=$("pNextL").textContent=paged?`${pg+1} / ${pageCount}`:"";
-  // Topics page: a Home page holding only topic folders
-  let topicsPage=-1;
-  if(id==="home"&&N){ const fi=bd.buttons.findIndex(b=>b.type==="folder"); if(fi>=0&&bd.buttons.slice(Math.floor(fi/N)*N,fi).every(b=>b.type==="blank")) topicsPage=Math.floor(fi/N); }
-  const onTopics=topicsPage>=0&&pg>=topicsPage;
-  if(onTopics){ $("crumb").textContent="Home › Topics"; $("pPrevL").textContent=$("pNextL").textContent=`Topics · ${pg+1}/${pageCount}`; }
-  $("nTopics").style.display=topicsPage>=0&&view==="board"&&!onTopics?"":"none";
-  $("nTopics").onclick=()=>{ pageOf.home=topicsPage; renderBoard(); };
   $("nBackBoard").style.display=path.length>1?"flex":"none";
   requestAnimationFrame(sizeCells);
 }
@@ -959,7 +978,7 @@ $("ePhoto").onchange=e=>{
   im.onerror=()=>toast("That picture could not be opened");
   im.src=url;
 };
-function addButton(){openEditor({id:nid(),type:"word",label:"",sym:"",cat:"misc"},true);}
+function addButton(){ const onHome=curId()==="home"; openEditor({id:nid(),type:onHome?"folder":"word",label:"",sym:"",cat:onHome?"folder":"misc",target:onHome?"__new":undefined},true); }
 $("eCancel").onclick=()=>hide("oEdit");
 $("eDel").onclick=async()=>{
   const ok=await ask("Delete button?",`"${editRef.b.label}" will be removed from this board.`,{okText:"Delete"});
@@ -1125,7 +1144,7 @@ let scanTimer=null, scanIdx=-1, scanPaused=false;
 function scanTargets(){
   const area=view==="kbd"?[...$("pred").children,...$("keys").children]:[...grid.querySelectorAll("button.cell:not(.blank-slot)")];
   const pagers=document.body.classList.contains("paged")?[$("pPrev"),$("pNext")].filter(b=>!b.disabled):[];
-  return [...area,...pagers,$("bSpeak"),$("bBack"),$("bClear"),$("nHome"),...(path.length>1&&view==="board"?[$("nBackBoard")]:[]),...($("nTopics").style.display!=="none"?[$("nTopics")]:[]),$("nKbd")];
+  return [...area,...pagers,$("bSpeak"),$("bBack"),$("bClear"),$("nHome"),...(path.length>1&&view==="board"?[$("nBackBoard")]:[]),$("nKbd")];
 }
 function startScan(){
   stopScan(); if(!S.scan||editing)return; scanIdx=-1;
@@ -1485,7 +1504,7 @@ function goalPlan(a,boards,N){
   const meals=(pv.routines||[]).some(r=>/breakfast|lunch|dinner|snack|meal/i.test(r)), interests=(pv.interests||[]).length>0;
   // candidate pool: Home's words + goal extras from other boards
   const pool=new Map();
-  boards.home.buttons.filter(b=>b.type!=="folder"&&b.type!=="blank").forEach(b=>pool.set(b.label.toLowerCase(),b));
+  (boards.core||{buttons:[]}).buttons.filter(b=>b.type!=="folder"&&b.type!=="blank").forEach(b=>pool.set(b.label.toLowerCase(),b));
   Object.keys(goals).forEach(g=>(GOAL_EXTRAS[g]||[]).forEach(l=>{ if(!pool.has(l.toLowerCase())){ const w=findWord(boards,l); if(w) pool.set(l.toLowerCase(),{...w,id:nid(),_extra:true}); } }));
   const scored=[...pool.values()].map(b=>{
     const k=b.label.toLowerCase(), tags=WORD_TAGS[k]||[], why=[];
@@ -1510,16 +1529,13 @@ function goalPlan(a,boards,N){
   const rest=scored.filter(it=>!page1Set.has(it.k)&&!it.b._extra).map(it=>it.b); // extras that didn't make page 1 stay in their folders
   const folders=boards.home.buttons.filter(b=>b.type==="folder").map((b,i)=>{
     const g=FOLDER_GOALS[b.label]||[]; let s=-i*0.01; g.forEach(t=>s+=goals[t]||0);
-    if(b.target==="mywords") s+=10; if(b.label==="People"&&(pv.people||[]).length) s+=2;
+    if(b.target==="core") s+=100; if(b.target==="mywords") s+=10; if(b.label==="People"&&(pv.people||[]).length) s+=2;
     return {b,s};
   }).sort((x,y)=>y.s-x.s).map(x=>x.b);
   return {version:GV,size,goals,page1:page1.map(p=>({b:p.b,score:Math.round(p.s*10)/10,why:p.why.length?p.why:["common core word"]})),rest,folders};
 }
 /* Lay Home out: page-1 words, the remaining words, then topic folders starting on a fresh page. */
-function homeFromPlan(plan,N){
-  const words=[...plan.page1.map(p=>({...p.b,_extra:undefined})),...plan.rest];
-  return withTopicsPage(words,plan.folders,N);
-}
+function coreFromPlan(plan){ return [...plan.page1.map(p=>({...p.b,_extra:undefined})),...plan.rest]; }
 function withTopicsPage(words,folders,N){
   const out=words.slice();
   if(N&&N!=="all"){ while(out.length%N!==0) out.push({id:nid(),type:"blank",label:""}); }
@@ -1539,13 +1555,24 @@ function topicsGrouped(board,N){
   let last=fi-1; while(last>=0&&bt[last].type==="blank") last--;
   return fi%N===0 && fi-(last+1)<N;
 }
-function ensureHomeTopics(){
-  const h=state.boards.home, N=boardLayout(h);
-  if(!topicsGrouped(h,N)){ groupTopics(h,N); save(); }
+function ensureHomeTopicsOnly(){
+  const B=state.boards, h=B.home;
+  const words=h.buttons.filter(b=>b.type!=="folder"&&b.type!=="blank");
+  const hasBlanks=h.buttons.some(b=>b.type==="blank");
+  if(!words.length&&!hasBlanks) return;
+  if(words.length){
+    B.core=B.core||{name:"Core Words",buttons:[]};
+    const put=w=>{ const i=B.core.buttons.findIndex(x=>x.type==="blank"); if(i>=0) B.core.buttons[i]=w; else B.core.buttons.push(w); };
+    words.forEach(put);
+    if(!h.buttons.some(b=>b.target==="core")) h.buttons.unshift(F("Core Words","🗣️","core"));
+    toast(`Home shows topic folders only — “${words[0].label}” was put in Core Words`);
+  }
+  h.buttons=h.buttons.filter(b=>b.type==="folder");
+  save();
 }
 function canAutoArrange(){
-  const fresh=starter().home.buttons.map(b=>b.label).join("|");
-  const cur=state.boards.home.buttons.filter(b=>b.type!=="blank").map(b=>b.label).filter(l=>l!=="My Words").join("|");
+  const fresh=starter().core.buttons.map(b=>b.label).join("|");
+  const cur=((state.boards.core||{buttons:[]}).buttons).filter(b=>b.type!=="blank").map(b=>b.label).join("|");
   const used=state.history.length>0||(state.profile&&["Trial selected","In use"].includes(state.profile.configuration_status));
   return cur===fresh&&!used;
 }
@@ -1555,7 +1582,7 @@ function goalPlanHTML(c){
   return `<div class="recbox"><h3>🎯 Goal-driven starting page</h3>
    <p class="hint">${gl.length?`Ranked from the goals and situations you chose: <b>${esc(gl.join(", "))}</b>.`:"No goals chosen, so common core words are used."} Page 1 always keeps a word for each of requesting, refusing, asking, commenting, feelings and help — priorities add emphasis, they never hide words.</p>
    <div class="firstwords">${p.page1.map(x=>`<span title="${esc(x.why.join("; "))}">${x.b.sym||""} ${esc(x.b.label)} <small style="font-weight:400;color:var(--muted)">· ${esc(x.why[0])}</small></span>`).join("")}</div>
-   <p class="hint">${c.arrange?`Home will start with these ${p.size} words, then the rest of the core words, then the <b>Topics</b> page with the category folders (${esc(p.folders.map(f=>f.label).join(", "))}).`:`Home already has learned word positions, so words are not moved. To arrange Home around these goals, choose it in <b>Adjust settings</b>. Topic folders stay on Home's Topics page either way.`}</p></div>`;
+   <p class="hint">${c.arrange?`Home shows the topic folders (${esc(p.folders.map(f=>f.label).join(", "))}). <b>Core Words</b> will start with these ${p.size} words, then the rest.`:`Core Words already has learned positions, so words are not moved. To arrange it around these goals, choose it in <b>Adjust settings</b>. Home always shows the topic folders.`}</p></div>`;
 }
 
 /* ---- the rules (R01–R14) ---- */
@@ -1658,7 +1685,7 @@ function buildConfig(override){
   if(ip==="typing"&&(val(a,"literacy_experience")||[]).includes("not_yet")) R("R14","Typing was chosen and letters haven't been explored yet — that's fine. Typing stays available; no literacy gate is applied.");
   if(override) Object.assign(cfg,override);
   // Goal-driven start (TB-G)
-  cfg.plan=goalPlan(a,state.boards,cfg.layout); cfg.arrange=canAutoArrange();
+  cfg.plan=goalPlan(a,state.boards,cfg.layout); cfg.arrange=canAutoArrange()&&!["works_well","adjusting"].includes(ex); // R02: keep a familiar system unless the team chooses
   R("Goals",cfg.arrange?`Home page 1 is filled from the child's goals and situations (${GV}), with a guaranteed word for each communication function; topic folders move to their own Topics page.`:"Home already has learned button positions, so the goal ranking is shown but nothing is moved unless you choose it in Adjust settings.");
   cfg.reviews=[...cfg.reviews];
   return cfg;
@@ -1713,8 +1740,8 @@ function adjustHTML(){
   <div class="row"><label><input type="checkbox" id="adScan" ${c.scan?"checked":""} ${c.checks.switch==="passed"?"":"disabled"}> Switch scanning ${c.checks.switch==="passed"?"":"(run the switch check in the preview first)"}</label></div>
   <div class="row"><label><input type="checkbox" id="adProtect" ${state.settings.protect?"checked":""}> Communication-only mode (hide Edit)</label></div>
   <h3>Home arrangement</h3>
-  <div class="row"><label><input type="checkbox" id="adArrange" ${c.arrange?"checked":""}> Arrange Home around the child's goals (page 1 from the goal ranking)</label></div>
-  <p class="hint">${canAutoArrange()?"Home is still the starter layout, so arranging it is safe.":"⚠️ This moves words the child may have learned. Choose it only on purpose."} Topic folders always sit on Home's own Topics page.</p>
+  <div class="row"><label><input type="checkbox" id="adArrange" ${c.arrange?"checked":""}> Arrange Core Words (and the order of Home's topics) around the child's goals</label></div>
+  <p class="hint">${canAutoArrange()?"Home is still the starter layout, so arranging it is safe.":"⚠️ This moves words the child may have learned. Choose it only on purpose."} Home always shows only the topic folders; the ranked words go in Core Words.</p>
   <h3>Vocabulary</h3>
   <div class="row"><label><input type="radio" name="adVoc" value="add" ${c.vocab_action!=="replace"?"checked":""}> Keep current boards and add personal words (button locations kept)</label></div>
   <div class="row"><label><input type="radio" name="adVoc" value="replace" ${c.vocab_action==="replace"?"checked":""}> Start again from the TalkBoard starter vocabulary + personal words</label></div>
@@ -1777,7 +1804,7 @@ function applyConfig(c){
   const S=state.settings;
   if(c.vocab_action==="replace"){ state.boards=starter(); Object.keys(pageOf).forEach(k=>delete pageOf[k]); }
   addPersonalWords(state.boards,c.additions);
-  if(c.arrange){ const plan=goalPlan(iw.a,state.boards,c.layout); state.boards.home.buttons=homeFromPlan(plan,c.layout); c.plan=plan; }
+  if(c.arrange){ const plan=goalPlan(iw.a,state.boards,c.layout); state.boards.core.buttons=coreFromPlan(plan); state.boards.home.buttons=plan.folders; c.plan=plan; }
   Object.keys(pageOf).forEach(k=>delete pageOf[k]);
   Object.assign(S,{layout:c.layout,gap:c.gap,symScale:c.symScale,theme:c.theme,speakEach:c.speakEach,calm:c.calm,highlight:c.highlight,
     vibrate:!!(c.vibrate&&c.checks.vibration==="supported"),scan:!!(c.scan&&c.checks.switch==="passed"),inputStyle:c.input_style,rate:c.rate||S.rate});
