@@ -1940,7 +1940,7 @@ document.addEventListener("keydown",e=>{
    Searched only by an adult in Edit mode. The chosen photo is downloaded, shrunk and stored on the device,
    so it keeps working offline. Only the search words are sent to Openverse (WordPress.org). */
 const OV_API="https://api.openverse.org/v1/images/";
-const PHOTO_CONTEXT={food:"food",drinks:"drink",places:"place",things:"",body:"body",actions:"",describe:"",feelings:"",people:"",numbers:"number",days:"",months:"",chat:"",questions:"",mywords:"",home:""};
+const PHOTO_CONTEXT={food:"",drinks:"",places:"",things:"",body:"body",actions:"",describe:"",feelings:"",people:"",numbers:"number",days:"",months:"",chat:"",questions:"",mywords:"",home:""};
 const ovCache=new Map();
 async function searchPhotos(q,page=1,size=20){
   const key=q+"|"+page+"|"+size; if(ovCache.has(key)) return ovCache.get(key);
