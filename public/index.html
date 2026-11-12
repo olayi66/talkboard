@@ -1940,6 +1940,10 @@ document.addEventListener("keydown",e=>{
    Searched only by an adult in Edit mode. The chosen photo is downloaded, shrunk and stored on the device,
    so it keeps working offline. Only the search words are sent to Openverse (WordPress.org). */
 const OV_API="https://api.openverse.org/v1/images/";
+// On the TalkBoard website, searches go through its own /api/photos (shared cache + optional API key).
+// Anywhere else (a preview, a local file), the app talks to Openverse directly.
+const OV_PROXY=(/^https?:$/.test(location.protocol)&&!/(^|\.)claude\.ai$|claudeusercontent|anthropic/.test(location.hostname))?"/api/photos":null;
+let ovProxyOK=!!OV_PROXY;
 const PHOTO_CONTEXT={food:"",drinks:"",places:"",things:"",body:"body",actions:"",describe:"",feelings:"",people:"",numbers:"number",days:"",months:"",chat:"",questions:"",mywords:"",home:""};
 const ovCache=new Map();
 /* Openverse allows anonymous apps at most 20 results per request and can be slow or drop requests,
@@ -1960,7 +1964,7 @@ async function ovFetch(url,tries=3){
       const r=await fetchWithTimeout(url,12000);
       if(r.ok) return r;
       last=new Error("http "+r.status);
-      if(r.status===401||r.status===400) throw last; // not worth retrying
+      if(r.status===401||r.status===400||r.status===404) throw last; // not worth retrying
     }catch(e){ last=e; if(String(e.message).startsWith("http 40")&&e.message!=="http 408") throw e; }
     await new Promise(ok=>setTimeout(ok,700*(i+1)+Math.random()*400));
   }
@@ -1970,6 +1974,14 @@ async function searchPhotos(q,page=1,size=20){
   size=Math.min(size,OV_MAX);
   const key=q+"|"+page+"|"+size; if(ovCache.has(key)) return ovCache.get(key);
   if(!navigator.onLine) throw new Error("offline");
+  if(ovProxyOK){
+    await ovSlot();
+    try{
+      const r=await ovFetch(`${OV_PROXY}?q=${encodeURIComponent(q)}&page=${page}&size=${size}`);
+      const j=await r.json(); const res={total:j.total||0,items:j.items||[]}; ovCache.set(key,res); return res;
+    }catch(e){ if(String(e.message)==="http 404") ovProxyOK=false; else throw e; } // no /api on this host: go direct
+    finally{ ovDone(); }
+  }
   const u=`${OV_API}?q=${encodeURIComponent(q)}&license=cc0,pdm&mature=false&page_size=${size}&page=${page}`;
   await ovSlot(); let r; try{ r=await ovFetch(u); } finally { ovDone(); }
   const j=await r.json();

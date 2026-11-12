@@ -1,7 +1,10 @@
 # TalkBoard AAC — static site, no build step
 [build]
-  publish = "."
+  publish = "public"
   command = ""
+
+[functions]
+  directory = "netlify/functions"
 
 # Always fetch the newest app shell and service worker so updates reach devices
 [[headers]]
