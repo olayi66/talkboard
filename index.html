@@ -1942,17 +1942,42 @@ document.addEventListener("keydown",e=>{
 const OV_API="https://api.openverse.org/v1/images/";
 const PHOTO_CONTEXT={food:"",drinks:"",places:"",things:"",body:"body",actions:"",describe:"",feelings:"",people:"",numbers:"number",days:"",months:"",chat:"",questions:"",mywords:"",home:""};
 const ovCache=new Map();
+/* Openverse allows anonymous apps at most 20 results per request and can be slow or drop requests,
+   so: cap the page size, time out, retry with back-off, and run at most 2 searches at once. */
+const OV_MAX=20;
+let ovActive=0; const ovQueue=[];
+function ovSlot(){ return new Promise(ok=>{ const go=()=>{ ovActive++; ok(); }; ovActive<2?go():ovQueue.push(go); }); }
+function ovDone(){ ovActive--; const n=ovQueue.shift(); if(n) n(); }
+async function fetchWithTimeout(url,ms){
+  const ac=new AbortController(); const t=setTimeout(()=>ac.abort(),ms);
+  try{ return await fetch(url,{signal:ac.signal}); } finally { clearTimeout(t); }
+}
+async function ovFetch(url,tries=3){
+  let last;
+  for(let i=0;i<tries;i++){
+    if(!navigator.onLine) throw new Error("offline");
+    try{
+      const r=await fetchWithTimeout(url,12000);
+      if(r.ok) return r;
+      last=new Error("http "+r.status);
+      if(r.status===401||r.status===400) throw last; // not worth retrying
+    }catch(e){ last=e; if(String(e.message).startsWith("http 40")&&e.message!=="http 408") throw e; }
+    await new Promise(ok=>setTimeout(ok,700*(i+1)+Math.random()*400));
+  }
+  throw last||new Error("failed");
+}
 async function searchPhotos(q,page=1,size=20){
+  size=Math.min(size,OV_MAX);
   const key=q+"|"+page+"|"+size; if(ovCache.has(key)) return ovCache.get(key);
   if(!navigator.onLine) throw new Error("offline");
   const u=`${OV_API}?q=${encodeURIComponent(q)}&license=cc0,pdm&mature=false&page_size=${size}&page=${page}`;
-  const r=await fetch(u); if(!r.ok) throw new Error("http "+r.status);
+  await ovSlot(); let r; try{ r=await ovFetch(u); } finally { ovDone(); }
   const j=await r.json();
   const res={total:j.result_count||0,items:(j.results||[]).filter(x=>x.thumbnail).map(x=>({id:x.id,title:x.title||"",license:x.license,source:x.source,thumb:x.thumbnail,landing:x.foreign_landing_url||""}))};
   ovCache.set(key,res); return res;
 }
 async function photoToDataURL(item,max=220){
-  const blob=await fetch(item.thumb).then(r=>{ if(!r.ok) throw new Error("http "+r.status); return r.blob(); });
+  const blob=await (await ovFetch(item.thumb)).blob();
   const url=URL.createObjectURL(blob);
   try{
     const im=await new Promise((ok,bad)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=bad;i.src=url;});
@@ -1968,7 +1993,7 @@ function defaultQuery(label,boardId){
   const l=String(label||"").replace(/[!?.…,]/g,"").trim();
   return (ctx&&!l.toLowerCase().includes(ctx)?`${l} ${ctx}`:l).trim();
 }
-const photoErr=e=>String(e&&e.message)==="offline"?"You're offline — photo search needs the internet. Photos you've already chosen still work offline.":"Couldn't reach the free photo library just now. Please try again.";
+const photoErr=e=>String(e&&e.message)==="offline"?"You're offline — photo search needs the internet. Photos you've already chosen still work offline.":"The free photo library is busy right now. Wait a few seconds and press Search again.";
 
 /* ---- in the button editor ---- */
 let editImgMeta=null, ePh={q:"",page:1};
@@ -1977,7 +2002,7 @@ async function runEditorSearch(more){
   if(!more){ ePh={q,page:1}; $("ePhRes").innerHTML=""; } else ePh.page++;
   const box=$("ePhRes"), st=$("ePhStatus"); st.textContent="Searching free photos…";
   try{
-    const r=await searchPhotos(ePh.q,ePh.page,24);
+    const r=await searchPhotos(ePh.q,ePh.page,20);
     if(!r.items.length&&ePh.page===1){ st.textContent="No free photos found. Try a different word (e.g. “red apple” or “swing park”)."; return; }
     box.insertAdjacentHTML("beforeend",r.items.map(it=>`<button class="phopt" data-ph="${esc(JSON.stringify(it))}" title="${esc(it.title)}"><img src="${esc(it.thumb)}" alt="${esc(it.title)}" loading="lazy" referrerpolicy="no-referrer"></button>`).join(""));
     st.textContent=`${r.total.toLocaleString()} free photos · tap one to use it`;
@@ -1995,6 +2020,7 @@ document.addEventListener("click",async e=>{
     catch(err){ $("ePhStatus").textContent=photoErr(err); }
   }
 });
+document.addEventListener("error",e=>{ const im=e.target; if(im&&im.tagName==="IMG"&&im.closest&&im.closest(".phopt")) im.closest(".phopt").remove(); },true);
 document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.id==="ePhQ"){ e.preventDefault(); runEditorSearch(false); } });
 function primeEditorPhotos(b){
   $("ePhQ").value=defaultQuery(b.label,curId()); $("ePhRes").innerHTML=""; $("ePhStatus").textContent=""; $("ePhMore").style.display="none";
@@ -2019,7 +2045,7 @@ function openBulkPhotos(){
   show("oPhotos");
   // load rows a few at a time so the list appears quickly
   const ids=btns.map(b=>b.id); let i=0;
-  const next=()=>{ const batch=ids.slice(i,i+4); i+=4; Promise.all(batch.map(bid=>bulkLoad(bid,false))).then(()=>{ if(i<ids.length&&$("oPhotos").classList.contains("show")) next(); }); };
+  const next=()=>{ const batch=ids.slice(i,i+2); i+=2; Promise.all(batch.map(bid=>bulkLoad(bid,false))).then(()=>{ if(i<ids.length&&$("oPhotos").classList.contains("show")) next(); }); };
   next();
 }
 async function bulkLoad(bid,more){
