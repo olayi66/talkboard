@@ -153,6 +153,17 @@ body.highlight .cell:active,body.highlight .cell:focus-visible{outline:6px solid
   .sheet{width:100%;box-shadow:none;padding:0;height:190mm;aspect-ratio:auto;page-break-after:always;break-after:page}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 } body.editing #nLayout{display:flex}
+#nPhotos{display:none} body.editing #nPhotos{display:flex}
+.phgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;max-height:300px;overflow:auto;margin-top:6px}
+.phopt{border:3px solid transparent;border-radius:10px;padding:0;background:var(--bg);aspect-ratio:1;overflow:hidden;cursor:pointer}
+.phopt img{width:100%;height:100%;object-fit:cover;display:block}
+.phopt.on{border-color:var(--accent)} .phopt.busy{opacity:.5}
+.dlg.wide{max-width:900px}
+.bprow{border-bottom:1px solid var(--line);padding:10px 0}
+.bpcur{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.bpnow{width:56px;height:56px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:2rem;overflow:hidden;flex-shrink:0}
+.bpnow img{width:100%;height:100%;object-fit:cover}
+.bpopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
 .cell{position:relative;border:2px solid #00000018;border-radius:var(--radius);background:var(--c-misc);
   display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;overflow:hidden;
   box-shadow:0 2px 0 #00000014;transition:transform .06s}
@@ -226,6 +237,7 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <div id="crumb">Home</div>
   <span id="editBadge">EDIT MODE</span>
   <button class="navbtn" id="nLayout">🔲<span class="nt"> Layout</span></button>
+  <button class="navbtn" id="nPhotos">📷<span class="nt"> Photos</span></button>
   <button class="navbtn" id="nEdit">✏️<span class="nt"> Edit</span></button>
   <button class="navbtn" id="nSet">⚙️</button>
 </div>
@@ -252,6 +264,10 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <div class="emojis" id="eEmojis"></div>
   <div class="row"><label>Or use a photo</label><input type="file" id="ePhoto" accept="image/*"><img id="ePhotoPrev" alt=""><button class="b" id="ePhotoDel" type="button">Remove photo</button></div>
   <p class="hint">Take or choose a photo of a person, place or favourite thing. It is shrunk and kept on this device.</p>
+  <div class="row"><label>Or find a real-world photo</label><input type="text" id="ePhQ" placeholder="Search free photos, e.g. apple"><button class="b" id="ePhGo" type="button">🔎 Search</button></div>
+  <div class="phgrid" id="ePhRes"></div>
+  <div class="row" style="margin-top:4px"><span class="hint" id="ePhStatus" style="flex:1"></span><button class="b" id="ePhMore" type="button" style="display:none">More photos ▶</button></div>
+  <p class="hint">Free public-domain and CC0 photos from Openverse (WordPress.org) — fine to use in any app. Only your search words are sent; the photo you pick is saved on this device and works offline.</p>
   <div class="row"><label>Word type / color</label></div>
   <div class="swatches" id="eSw"></div>
   <div class="row"><label>Button does</label>
@@ -344,6 +360,13 @@ body.editing .cell{outline:2px dashed #e8a400;outline-offset:-5px}
   <div class="tplpick" id="lPick" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin-top:10px"></div>
   <div class="row"><label><input type="checkbox" id="lFill"> Add empty spaces so the last page is full</label></div>
   <div class="btns"><button class="b" id="lCancel">Cancel</button><button class="b primary" id="lSave">Apply</button></div>
+</div></div>
+
+<div class="overlay" id="oPhotos"><div class="dlg wide">
+  <h2 id="bpTitle">Photos</h2>
+  <p class="hint" id="bpStatus"></p>
+  <div id="bpList"></div>
+  <div class="btns"><button class="b" id="bpCancel">Cancel</button><button class="b primary" id="bpSave">Save</button></div>
 </div></div>
 
 <div class="overlay" id="oHist"><div class="dlg">
@@ -985,7 +1008,7 @@ $("eTarget").onchange=()=>$("eType").onchange();
 $("eTpl").innerHTML='<option value="all">Show all (no fixed spaces)</option>'+TPL_KEYS.map(n=>`<option value="${n}">${tplName(n)} per page</option>`).join("");
 $("eTpl").value="4";
 function openEditor(b,isNew){
-  editRef={b,isNew}; editImg=b.img||""; showPhoto();
+  editRef={b,isNew}; editImg=b.img||""; showPhoto(); primeEditorPhotos(b);
   $("eTitle").textContent=isNew?"Add button":"Edit button";
   $("eLabel").value=b.label||"";$("eSpeak").value=b.speak&&b.speak!==b.label?b.speak:"";$("eSym").value=b.sym||"";
   $("eSymFind").value="";renderEmojis();
@@ -1001,7 +1024,7 @@ function openEditor(b,isNew){
 }
 let editImg="";
 function showPhoto(){const im=$("ePhotoPrev");im.src=editImg||"";im.style.display=editImg?"inline":"none";$("ePhotoDel").style.display=editImg?"inline-block":"none";$("ePhoto").value="";}
-$("ePhotoDel").onclick=()=>{editImg="";showPhoto();};
+$("ePhotoDel").onclick=()=>{editImg="";editImgMeta=null;showPhoto();};
 $("ePhoto").onchange=e=>{
   const f=e.target.files[0]; if(!f)return;
   const url=URL.createObjectURL(f), im=new Image();
@@ -1009,7 +1032,7 @@ $("ePhoto").onchange=e=>{
     const max=320, sc=Math.min(1,max/Math.max(im.width,im.height));
     const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc);
     const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
-    editImg=c.toDataURL("image/jpeg",0.82); URL.revokeObjectURL(url); showPhoto();
+    editImg=c.toDataURL("image/jpeg",0.82); editImgMeta=null; URL.revokeObjectURL(url); showPhoto();
   };
   im.onerror=()=>toast("That picture could not be opened");
   im.src=url;
@@ -1024,7 +1047,7 @@ $("eDel").onclick=async()=>{
 $("eSave").onclick=async()=>{
   const b=editRef.b, label=$("eLabel").value.trim();
   if(!label){toast("Please add a label");return;}
-  b.label=label; b.speak=$("eSpeak").value.trim(); b.sym=$("eSym").value.trim(); if(editImg) b.img=editImg; else delete b.img; b.type=$("eType").value; b.hidden=$("eHidden").checked;
+  b.label=label; b.speak=$("eSpeak").value.trim(); b.sym=$("eSym").value.trim(); if(editImg){ b.img=editImg; if(editImgMeta) b.imgSrc=editImgMeta; else delete b.imgSrc; } else { delete b.img; delete b.imgSrc; } b.type=$("eType").value; b.hidden=$("eHidden").checked;
   b.cat=b.type==="folder"?"folder":(editCat==="folder"?"misc":editCat);
   if(b.type==="folder"){
     let t=$("eTarget").value;
@@ -1899,7 +1922,7 @@ function openFollowUp(){
 }
 
 /* ---- Tap outside a pop-up window to close it (not the questionnaire, so answers aren't lost by accident) ---- */
-const OUTSIDE_CLOSE={oSet:"sClose",oEdit:"eCancel",oHist:"hClose",oLayout:"lCancel",oAsk:"aNo",oPrint:"prClose"};
+const OUTSIDE_CLOSE={oPhotos:"bpCancel",oSet:"sClose",oEdit:"eCancel",oHist:"hClose",oLayout:"lCancel",oAsk:"aNo",oPrint:"prClose"};
 let downOnBackdrop=null;
 document.addEventListener("pointerdown",e=>{ downOnBackdrop=(e.target.classList&&e.target.classList.contains("overlay"))?e.target:null; },true);
 document.addEventListener("click",e=>{
@@ -1913,6 +1936,130 @@ document.addEventListener("keydown",e=>{
   const btn=OUTSIDE_CLOSE[open.id]; if(btn&&$(btn)){ e.preventDefault(); $(btn).click(); }
 });
 
+/* ====================== Real-world photo library (Openverse, public domain + CC0 only) ======================
+   Searched only by an adult in Edit mode. The chosen photo is downloaded, shrunk and stored on the device,
+   so it keeps working offline. Only the search words are sent to Openverse (WordPress.org). */
+const OV_API="https://api.openverse.org/v1/images/";
+const PHOTO_CONTEXT={food:"food",drinks:"drink",places:"place",things:"",body:"body",actions:"",describe:"",feelings:"",people:"",numbers:"number",days:"",months:"",chat:"",questions:"",mywords:"",home:""};
+const ovCache=new Map();
+async function searchPhotos(q,page=1,size=20){
+  const key=q+"|"+page+"|"+size; if(ovCache.has(key)) return ovCache.get(key);
+  if(!navigator.onLine) throw new Error("offline");
+  const u=`${OV_API}?q=${encodeURIComponent(q)}&license=cc0,pdm&mature=false&page_size=${size}&page=${page}`;
+  const r=await fetch(u); if(!r.ok) throw new Error("http "+r.status);
+  const j=await r.json();
+  const res={total:j.result_count||0,items:(j.results||[]).filter(x=>x.thumbnail).map(x=>({id:x.id,title:x.title||"",license:x.license,source:x.source,thumb:x.thumbnail,landing:x.foreign_landing_url||""}))};
+  ovCache.set(key,res); return res;
+}
+async function photoToDataURL(item,max=220){
+  const blob=await fetch(item.thumb).then(r=>{ if(!r.ok) throw new Error("http "+r.status); return r.blob(); });
+  const url=URL.createObjectURL(blob);
+  try{
+    const im=await new Promise((ok,bad)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=bad;i.src=url;});
+    const sc=Math.min(1,max/Math.max(im.width,im.height));
+    const c=document.createElement("canvas"); c.width=Math.max(1,Math.round(im.width*sc)); c.height=Math.max(1,Math.round(im.height*sc));
+    const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
+    return c.toDataURL("image/jpeg",0.74);
+  } finally { URL.revokeObjectURL(url); }
+}
+const photoMeta=it=>({provider:"openverse",id:it.id,license:it.license,source:it.source,title:it.title.slice(0,80)});
+function defaultQuery(label,boardId){
+  const ctx=PHOTO_CONTEXT[boardId]!==undefined?PHOTO_CONTEXT[boardId]:"";
+  const l=String(label||"").replace(/[!?.…,]/g,"").trim();
+  return (ctx&&!l.toLowerCase().includes(ctx)?`${l} ${ctx}`:l).trim();
+}
+const photoErr=e=>String(e&&e.message)==="offline"?"You're offline — photo search needs the internet. Photos you've already chosen still work offline.":"Couldn't reach the free photo library just now. Please try again.";
+
+/* ---- in the button editor ---- */
+let editImgMeta=null, ePh={q:"",page:1};
+async function runEditorSearch(more){
+  const q=$("ePhQ").value.trim(); if(!q) return;
+  if(!more){ ePh={q,page:1}; $("ePhRes").innerHTML=""; } else ePh.page++;
+  const box=$("ePhRes"), st=$("ePhStatus"); st.textContent="Searching free photos…";
+  try{
+    const r=await searchPhotos(ePh.q,ePh.page,24);
+    if(!r.items.length&&ePh.page===1){ st.textContent="No free photos found. Try a different word (e.g. “red apple” or “swing park”)."; return; }
+    box.insertAdjacentHTML("beforeend",r.items.map(it=>`<button class="phopt" data-ph="${esc(JSON.stringify(it))}" title="${esc(it.title)}"><img src="${esc(it.thumb)}" alt="${esc(it.title)}" loading="lazy" referrerpolicy="no-referrer"></button>`).join(""));
+    st.textContent=`${r.total.toLocaleString()} free photos · tap one to use it`;
+    $("ePhMore").style.display=r.items.length?"inline-block":"none";
+  }catch(e){ st.textContent=photoErr(e); }
+}
+document.addEventListener("click",async e=>{
+  const t=e.target;
+  if(t.id==="ePhGo"){ runEditorSearch(false); return; }
+  if(t.id==="ePhMore"){ runEditorSearch(true); return; }
+  const o=t.closest&&t.closest("#ePhRes .phopt");
+  if(o){
+    const it=JSON.parse(o.dataset.ph); $("ePhStatus").textContent="Saving photo…";
+    try{ editImg=await photoToDataURL(it); editImgMeta=photoMeta(it); showPhoto(); document.querySelectorAll("#ePhRes .phopt").forEach(x=>x.classList.toggle("on",x===o)); $("ePhStatus").textContent="Photo chosen — press Save to keep it."; }
+    catch(err){ $("ePhStatus").textContent=photoErr(err); }
+  }
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.id==="ePhQ"){ e.preventDefault(); runEditorSearch(false); } });
+function primeEditorPhotos(b){
+  $("ePhQ").value=defaultQuery(b.label,curId()); $("ePhRes").innerHTML=""; $("ePhStatus").textContent=""; $("ePhMore").style.display="none";
+  editImgMeta=b.imgSrc||null;
+}
+
+/* ---- for a whole category ---- */
+const bulk={rows:{},pending:{}};
+function openBulkPhotos(){
+  const bd=curBoard(), id=curId();
+  const btns=bd.buttons.filter(b=>b.type!=="blank"&&b.type!=="folder");
+  if(!btns.length){ toast("This board has no word buttons — open a category first"); return; }
+  bulk.rows={}; bulk.pending={};
+  $("bpTitle").textContent=`Photos for “${bd.name}”`;
+  $("bpList").innerHTML=btns.map(b=>`<div class="bprow" data-id="${b.id}">
+    <div class="bpcur"><div class="bpnow">${b.img?`<img src="${b.img}" alt="">`:`<span>${b.sym||"⬜"}</span>`}</div><b>${esc(b.label)}</b>
+      <button class="chipb" data-bpemoji="${b.id}" ${b.img?"":"disabled"}>Use emoji</button></div>
+    <div class="bpopts" id="bpo_${b.id}"><span class="hint">Loading photos…</span></div>
+    <div class="row" style="margin:4px 0 0"><input type="text" class="bpq" data-bpq="${b.id}" value="${esc(defaultQuery(b.label,id))}"><button class="b" data-bpsearch="${b.id}">Search</button><button class="b" data-bpmore="${b.id}">More ▶</button></div>
+  </div>`).join("");
+  $("bpStatus").textContent="Public-domain and CC0 photos from Openverse. Tap a photo to choose it, then press Save.";
+  show("oPhotos");
+  // load rows a few at a time so the list appears quickly
+  const ids=btns.map(b=>b.id); let i=0;
+  const next=()=>{ const batch=ids.slice(i,i+4); i+=4; Promise.all(batch.map(bid=>bulkLoad(bid,false))).then(()=>{ if(i<ids.length&&$("oPhotos").classList.contains("show")) next(); }); };
+  next();
+}
+async function bulkLoad(bid,more){
+  const box=$("bpo_"+bid); if(!box) return;
+  const q=(document.querySelector(`[data-bpq="${bid}"]`)||{}).value||"";
+  const row=bulk.rows[bid]=more&&bulk.rows[bid]&&bulk.rows[bid].q===q?bulk.rows[bid]:{q,page:0};
+  row.page++;
+  if(!more) box.innerHTML=`<span class="hint">Loading photos…</span>`;
+  try{
+    const r=await searchPhotos(q,row.page,8);
+    const html=r.items.map(it=>`<button class="phopt" data-bpick="${bid}" data-ph="${esc(JSON.stringify(it))}" title="${esc(it.title)}"><img src="${esc(it.thumb)}" alt="${esc(it.title)}" loading="lazy" referrerpolicy="no-referrer"></button>`).join("");
+    if(!more) box.innerHTML=html||`<span class="hint">No free photos for “${esc(q)}”. Try another word.</span>`; else box.insertAdjacentHTML("beforeend",html);
+  }catch(e){ box.innerHTML=`<span class="hint">${esc(photoErr(e))}</span>`; }
+}
+document.addEventListener("click",async e=>{
+  const t=e.target; if(!t.closest||!t.closest("#oPhotos")) return;
+  if(t.dataset.bpsearch){ bulkLoad(t.dataset.bpsearch,false); return; }
+  if(t.dataset.bpmore){ bulkLoad(t.dataset.bpmore,true); return; }
+  if(t.dataset.bpemoji){ bulk.pending[t.dataset.bpemoji]={img:null}; const row=document.querySelector(`.bprow[data-id="${t.dataset.bpemoji}"]`); const b=curBoard().buttons.find(x=>x.id===t.dataset.bpemoji);
+    row.querySelector(".bpnow").innerHTML=`<span>${b.sym||"⬜"}</span>`; row.querySelectorAll(".phopt").forEach(x=>x.classList.remove("on")); t.disabled=true; return; }
+  const o=t.closest(".phopt[data-bpick]");
+  if(o){
+    const bid=o.dataset.bpick, it=JSON.parse(o.dataset.ph), row=document.querySelector(`.bprow[data-id="${bid}"]`);
+    o.classList.add("busy");
+    try{ const img=await photoToDataURL(it); bulk.pending[bid]={img,meta:photoMeta(it)};
+      row.querySelector(".bpnow").innerHTML=`<img src="${img}" alt="">`; row.querySelectorAll(".phopt").forEach(x=>x.classList.toggle("on",x===o));
+      row.querySelector("[data-bpemoji]").disabled=false; }
+    catch(err){ toast(photoErr(err)); }
+    o.classList.remove("busy");
+  }
+  if(t.id==="bpSave"){
+    const bd=curBoard(); let n=0;
+    Object.entries(bulk.pending).forEach(([bid,p])=>{ const b=bd.buttons.find(x=>x.id===bid); if(!b) return; if(p.img){ b.img=p.img; b.imgSrc=p.meta; } else { delete b.img; delete b.imgSrc; } n++; });
+    save(); hide("oPhotos"); renderBoard(); toast(n?`${n} button${n>1?"s":""} updated`:"No changes");
+  }
+  if(t.id==="bpCancel"){ hide("oPhotos"); }
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.dataset&&e.target.dataset.bpq){ e.preventDefault(); bulkLoad(e.target.dataset.bpq,false); } });
+
+$("nPhotos").onclick=openBulkPhotos;
 /* ====================== Init ====================== */
 buildKeys(); applyLook(); renderBoard(); renderMsg();
 try{ if("serviceWorker" in navigator && /^https?:/.test(location.protocol) && document.querySelector('link[rel=manifest]')) navigator.serviceWorker.register("sw.js").catch(()=>{}); }catch(e){}
